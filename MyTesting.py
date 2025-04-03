@@ -9,14 +9,17 @@ from utils.dataloader import My_test_dataset
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--testsize', type=int, default=704, help='testing size default 352')
-parser.add_argument('--pth_path', type=str, default='/youtu_action_data/xiaobinhu/dataset_hitnet_cod/checkpoints/Hitnet_pvt_pretrained_fusion/Net_epoch_best.pth')
+parser.add_argument('--testsize', type=int, default=352, help='testing size default 352')
+parser.add_argument('--pth_path', type=str, default='/kaggle/input/hitnet_paper/other/default/1/Net_epoch_best.pth')
+
 opt = parser.parse_args()
 
-# for _data_name in ['CAMO', 'COD10K', 'CHAMELEON',NC4K]:
-for _data_name in ['COD10K']:
-    data_path = '/youtu_action_data/xiaobinhu/dataset_hitnet_cod/TestDataset/{}/'.format(_data_name)
-    save_path = '/youtu_action_data/xiaobinhu/dataset_hitnet_cod/res/{}/{}/'.format(opt.pth_path.split('/')[-2], _data_name)
+print("COl")
+
+for _data_name in ['CottonWorm4']:
+    data_path = f'../../datasets/{_data_name}/test'
+    save_path = './results/{}/{}/'.format(opt.pth_path.split('/')[-2], _data_name)
+    
     model = Hitnet()
     model.load_state_dict(torch.load(opt.pth_path))
     model.cuda()
