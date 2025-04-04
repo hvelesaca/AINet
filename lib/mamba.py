@@ -37,7 +37,7 @@ class MambaBlock(nn.Module):
         )
         self.mamba = Mamba(
             d_model=out_dim,
-            d_state=16,
+            d_state=32,
             d_conv=4,
             expand=2
         )
