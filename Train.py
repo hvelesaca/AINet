@@ -51,12 +51,12 @@ def val(model, epoch, save_path, writer):
     model.eval()
     with torch.no_grad():
         mae_sum = 0
-        # test_loader = test_dataset(image_root=opt.test_path + 'Imgs/',
-        #                           gt_root=opt.test_path + 'GT/',
-        #                           testsize=opt.trainsize)
-        test_loader = test_dataset(image_root=opt.test_path + '/COD10K/Imgs/',
-                            gt_root=opt.test_path + '/COD10K/GT/',
-                            testsize=opt.trainsize)
+        test_loader = test_dataset(image_root=opt.test_path + '/Imgs/',
+                                   gt_root=opt.test_path + '/GT/',
+                                   testsize=opt.trainsize)
+        #test_loader = test_dataset(image_root=opt.test_path + '/COD10K/Imgs/',
+        #                    gt_root=opt.test_path + '/COD10K/GT/',
+        #                    testsize=opt.trainsize)
 
         for i in range(test_loader.size):
             image, gt, name = test_loader.load_data()
@@ -145,24 +145,24 @@ if __name__ == '__main__':
 
     ##################model_name#############################
     # model_name = 'Hitnet_pvt_wo_pretrained_fusion'
-    model_name = 'Hitnet_pvt_wo_pretrained_fusion_debug'
+    dataset = 'WeedBanana_LatLRR'
 
     ###############################################
     parser = argparse.ArgumentParser()
     parser.add_argument('--epoch', type=int,default=150, help='epoch number')
     parser.add_argument('--lr', type=float,default=1e-4, help='learning rate')
     parser.add_argument('--optimizer', type=str,default='AdamW', help='choosing optimizer AdamW or SGD')
-    parser.add_argument('--augmentation',default=False, help='choose to do random flip rotation')
+    parser.add_argument('--augmentation',default=True, help='choose to do random flip rotation')
     parser.add_argument('--batchsize', type=int,default=8, help='training batch size')
-    parser.add_argument('--trainsize', type=int,default=704, help='training dataset size,candidate=352,704,1056')
+    parser.add_argument('--trainsize', type=int,default=352, help='training dataset size,candidate=352,704,1056')
     parser.add_argument('--clip', type=float,default=0.5, help='gradient clipping margin')
     parser.add_argument('--load', type=str, default=None, help='train from checkpoints')
     parser.add_argument('--decay_rate', type=float,default=0.1, help='decay rate of learning rate')
     parser.add_argument('--decay_epoch', type=int,default=50, help='every n epochs decay learning rate')
-    parser.add_argument('--train_path', type=str,default='/youtu_action_data/xiaobinhu/dataset_hitnet_cod/TrainDataset',help='path to train dataset')
-    parser.add_argument('--test_path', type=str,default='/youtu_action_data/xiaobinhu/dataset_hitnet_cod/TestDataset',help='path to testing dataset')
-    parser.add_argument('--save_path', type=str,default='/youtu_action_data/xiaobinhu/dataset_hitnet_cod/checkpoints/'+model_name+'/')
-    parser.add_argument('--epoch_save', type=int,default=1, help='every n epochs to save model')
+    parser.add_argument('--train_path', type=str,default=f'C:/Respaldo/Henry/Proyecto Camuflaje/Datasets/{dataset}/train',help='path to train dataset')
+    parser.add_argument('--test_path', type=str,default=f'C:/Respaldo/Henry/Proyecto Camuflaje/Datasets/{dataset}/val',help='path to testing dataset')
+    parser.add_argument('--save_path', type=str,default=f'./checkpoints/Hitnet_{dataset}/')
+    parser.add_argument('--epoch_save', type=int,default=24, help='every n epochs to save model')
     opt = parser.parse_args()
 
 
