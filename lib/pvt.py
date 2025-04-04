@@ -476,7 +476,7 @@ class Hitnet(nn.Module):
         # Descargar pesos pre-entrenados automáticamente
         try:
             model_path = hf_hub_download(
-                repo_id="state-spaces/mamba-2.8b-hf",
+                repo_id="state-spaces/mamba-2.8b",
                 filename="pytorch_model.bin",
                 cache_dir="./pretrained_mamba"
             )
