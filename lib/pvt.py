@@ -6,7 +6,8 @@ import os
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
+# Importar VisionMamba de la librería
+from vision_mamba import Vim
 
 class BasicConv2d(nn.Module):
     def __init__(self, in_planes, out_planes, kernel_size, stride=1, padding=0, dilation=1):
@@ -338,7 +339,7 @@ class ORSNet(nn.Module):
 
         return x
 
-class Hitnet(nn.Module):
+class Hitnet2(nn.Module):
     def __init__(self, channel=32,n_feat=32,scale_unetfeats=32,kernel_size=3,reduction=4,bias=False,act=nn.PReLU()):
         super(Hitnet, self).__init__()
 
@@ -461,6 +462,114 @@ class Hitnet(nn.Module):
         prediction2_8 = F.interpolate(prediction2, scale_factor=8, mode='bilinear')
         return stage_loss, prediction2_8
 
+
+class Hitnet(nn.Module):
+    def __init__(self, channel=32, n_feat=32, scale_unetfeats=32, kernel_size=3, reduction=4, bias=False, act=nn.PReLU()):
+        super(Hitnet, self).__init__()
+
+        # Reemplazar el backbone PVT con VisionMamba
+        self.backbone = Vim(
+          dim=96,  # Dimension of the transformer model
+          #heads=8,  # Number of attention heads
+          dt_rank=32,  # Rank of the dynamic routing matrix
+          dim_inner=96,  # Inner dimension of the transformer model
+          d_state=16,  # Dimension of the state vector
+          num_classes=0,  # Number of output classes
+          image_size=352,  # Size of the input image
+          patch_size=16,  # Size of each image patch
+          channels=3,  # Number of input channels
+          dropout=0.1,  # Dropout rate
+          depth=12,  # Depth of the transformer model
+        )
+
+        # Ajustar las capas de traducción para las nuevas dimensiones
+        # Las dimensiones serán: [96, 192, 384, 768] para cada stage
+        self.Translayer2_0 = BasicConv2d(96, channel, 1)
+        self.Translayer2_1 = BasicConv2d(192, channel, 1)
+        self.Translayer3_1 = BasicConv2d(384, channel, 1)
+        self.Translayer4_1 = BasicConv2d(768, channel, 1)
+
+        self.ca = ChannelAttention(64)
+        self.sa = SpatialAttention()
+        self.SAM = SAM()
+
+        self.down05 = nn.Upsample(scale_factor=0.5, mode='bilinear', align_corners=True)
+        self.out_SAM = nn.Conv2d(channel, 1, 1)
+        self.out_CFM = nn.Conv2d(channel, 1, 1)
+
+        self.decoder_level4 = [CAB(n_feat, kernel_size, reduction, bias=bias, act=act) for _ in range(2)]
+        self.decoder_level3 = [CAB(n_feat+scale_unetfeats, kernel_size, reduction, bias=bias, act=act) for _ in range(2)]
+        self.decoder_level2 = [CAB(n_feat+(scale_unetfeats*2), kernel_size, reduction, bias=bias, act=act) for _ in range(2)]
+
+        self.decoder_level4 = nn.Sequential(*self.decoder_level4)
+        self.decoder_level3 = nn.Sequential(*self.decoder_level3)
+        self.decoder_level2 = nn.Sequential(*self.decoder_level2)
+
+        self.upsample = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
+        self.downsample_4 = nn.Upsample(scale_factor=0.25, mode='bilinear', align_corners=True)
+        self.upsample_4 = nn.Upsample(scale_factor=4, mode='bilinear', align_corners=True)
+
+        self.conv4 = BasicConv2d(3 * channel, channel, 3, padding=1)
+
+        self.decoder_level1 = [CAB(64, kernel_size, reduction, bias=bias, act=act) for _ in range(2)]
+        self.decoder_level1 = nn.Sequential(*self.decoder_level1)
+
+        self.compress_out = BasicConv2d(2 * channel, channel, kernel_size=8, stride=4, padding=2)
+        self.compress_out2 = BasicConv2d(2 * channel, channel, kernel_size=1)
+
+    def forward(self, x):
+        # Obtener features del backbone de Mamba
+        features = self.backbone(x)
+
+        print(f"Features returned by VisionMamba: {len(features)}")
+        print(f"Shapes of features: {[f.shape for f in features]}")
+
+        # Desempaquetar las features de los diferentes niveles
+        x1, x2, x3, x4 = features[:4]  # VisionMamba retorna una lista de features
+
+        # CIM
+        cim_feature = self.decoder_level1(x1)
+
+        # CFM
+        x2_t = self.Translayer2_1(x2)
+        x3_t = self.Translayer3_1(x3)
+        x4_t = self.Translayer4_1(x4)
+
+        # Stage 1
+        stage_loss = list()
+        cfm_feature = None
+
+        for iter in range(4):
+            if cfm_feature is None:
+                x4_t = x4_t
+            else:
+                x4_t = torch.cat((self.upsample_4(x4_t), cfm_feature), 1)
+                x4_t = self.compress_out(x4_t)
+
+            x4_t_feed = self.decoder_level4(x4_t)
+            x3_t_feed = torch.cat((x3_t, self.upsample(x4_t_feed)), 1)
+            x3_t_feed = self.decoder_level3(x3_t_feed)
+
+            if iter > 0:
+                x2_t = torch.cat((x2_t, cfm_feature), 1)
+                x2_t = self.compress_out2(x2_t)
+
+            x2_t_feed = torch.cat((x2_t, self.upsample(x3_t_feed)), 1)
+            x2_t_feed = self.decoder_level2(x2_t_feed)
+            cfm_feature = self.conv4(x2_t_feed)
+            prediction1 = self.out_CFM(cfm_feature)
+            prediction1_8 = F.interpolate(prediction1, scale_factor=8, mode='bilinear')
+            stage_loss.append(prediction1_8)
+
+        # SAM
+        T2 = self.Translayer2_0(cim_feature)
+        T2 = self.down05(T2)
+        sam_feature = self.SAM(cfm_feature, T2)
+
+        prediction2 = self.out_SAM(sam_feature)
+        prediction2_8 = F.interpolate(prediction2, scale_factor=8, mode='bilinear')
+
+        return stage_loss, prediction2_8
 
 if __name__ == '__main__':
     model = Hitnet().cuda()
