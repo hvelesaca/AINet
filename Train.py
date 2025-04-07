@@ -3,7 +3,7 @@ from torch.autograd import Variable
 import os
 import argparse
 from datetime import datetime
-from lib.pvt import Hitnet
+#from lib.pvt import Hitnet
 from utils.dataloader import get_loader, test_dataset
 from utils.utils import clip_gradient, adjust_lr, AvgMeter
 import torch.nn.functional as F
@@ -11,6 +11,8 @@ import numpy as np
 import logging
 from tensorboardX import SummaryWriter
 import matplotlib.pyplot as plt
+from lib.mamba_unet import VisionMambaUNet  # Añade esta línea
+
 ####
 ####CUDA_VISIBLE_DEVICES=0 python3 Train.py
 ####
@@ -162,7 +164,7 @@ if __name__ == '__main__':
     parser.add_argument('--train_path', type=str,default=f'../{dataset}/train',help='path to train dataset')
     parser.add_argument('--test_path', type=str,default=f'../{dataset}/val',help='path to testing dataset')
     parser.add_argument('--save_path', type=str,default=f'./model_pth/Hitnet_{dataset}/')
-    parser.add_argument('--epoch_save', type=int,default=10, help='every n epochs to save model')
+    parser.add_argument('--epoch_save', type=int,default=5, help='every n epochs to save model')
     opt = parser.parse_args()
 
 
@@ -177,8 +179,8 @@ if __name__ == '__main__':
 
     # ---- build models ----
     # torch.cuda.set_device(0)  # set your gpu device
-    model = Hitnet().cuda()
-
+    #model = Hitnet().cuda()
+    model = VisionMambaUNet(pretrained=True).cuda()
 
     if opt.load is not None:
         pretrained_dict=torch.load(opt.load)
@@ -199,7 +201,7 @@ if __name__ == '__main__':
     else:
         optimizer = torch.optim.SGD(params, opt.lr, weight_decay=1e-4, momentum=0.9)
 
-    print(optimizer)
+    #print(optimizer)
     image_root = '{}/Imgs/'.format(opt.train_path)
     gt_root = '{}/GT/'.format(opt.train_path)
 
