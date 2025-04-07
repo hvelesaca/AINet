@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from mamba_ssm import Mamba
+from huggingface_hub import hf_hub_download
 
 class MambaConvBlock(nn.Module):
     def __init__(self, in_channels, out_channels, stride=1):
@@ -10,7 +11,7 @@ class MambaConvBlock(nn.Module):
             nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True)
         )
-        self.mamba = Mamba(d_model=out_channels, d_state=32, d_conv=4, expand=2)
+        self.mamba = Mamba(d_model=out_channels, d_state=64, d_conv=4, expand=2)
         self.residual = nn.Sequential()
         if stride != 1 or in_channels != out_channels:
             self.residual = nn.Sequential(
@@ -46,7 +47,7 @@ class DecoderBlock(nn.Module):
         return self.conv(x)
 
 class VisionMambaUNet(nn.Module):
-    def __init__(self, in_channels=3, features=[64, 128, 256, 512]):
+    def __init__(self, in_channels=3, features=[64, 128, 256, 512], pretrained=True):
         super().__init__()
         self.stem = nn.Sequential(
             nn.Conv2d(in_channels, features[0], kernel_size=7, stride=2, padding=3, bias=False),
@@ -64,6 +65,9 @@ class VisionMambaUNet(nn.Module):
 
         self.seg_head = nn.Conv2d(features[0], 1, kernel_size=1)
 
+        if pretrained:
+            self.load_pretrained_weights()
+
     def forward(self, x):
         x0 = self.stem(x)
         x1 = self.enc1(x0)
@@ -78,4 +82,25 @@ class VisionMambaUNet(nn.Module):
         out = nn.functional.interpolate(d1, scale_factor=2, mode='bilinear', align_corners=False)
         out = self.seg_head(out)
 
-        return [out], out  # Mantiene compatibilidad con tu código original
+        return [out], out
+
+    def load_pretrained_weights(self):
+        try:
+            model_path = hf_hub_download(
+                repo_id="state-spaces/mamba-130m",
+                filename="pytorch_model.bin",
+                cache_dir="./pretrained_mamba"
+            )
+            pretrained_weights = torch.load(model_path, map_location='cpu')
+
+            model_dict = self.state_dict()
+            matched_weights = {k: v for k, v in pretrained_weights.items() if k in model_dict and v.shape == model_dict[k].shape}
+
+            model_dict.update(matched_weights)
+            self.load_state_dict(model_dict)
+
+            print(f"✅ Pesos pre-entrenados cargados exitosamente: {len(matched_weights)}/{len(model_dict)} capas coinciden.")
+
+        except Exception as e:
+            print(f"❌ Error cargando pesos pre-entrenados: {e}")
+            print("⚠️ Inicializando con pesos aleatorios...")
