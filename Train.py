@@ -11,7 +11,7 @@ import numpy as np
 import logging
 from tensorboardX import SummaryWriter
 import matplotlib.pyplot as plt
-from lib.mamba_unet import VisionMambaUNet  # Añade esta línea
+from lib.mamba_unet import VisionMambaPVTUNet  # Añade esta línea
 
 ####
 ####CUDA_VISIBLE_DEVICES=0 python3 Train.py
@@ -155,7 +155,7 @@ if __name__ == '__main__':
     parser.add_argument('--lr', type=float,default=1e-4, help='learning rate')
     parser.add_argument('--optimizer', type=str,default='AdamW', help='choosing optimizer AdamW or SGD')
     parser.add_argument('--augmentation',default=True, help='choose to do random flip rotation')
-    parser.add_argument('--batchsize', type=int,default=32, help='training batch size')
+    parser.add_argument('--batchsize', type=int,default=16, help='training batch size')
     parser.add_argument('--trainsize', type=int,default=352, help='training dataset size,candidate=352,704,1056')
     parser.add_argument('--clip', type=float,default=0.5, help='gradient clipping margin')
     parser.add_argument('--load', type=str, default=None, help='train from checkpoints')
@@ -180,7 +180,7 @@ if __name__ == '__main__':
     # ---- build models ----
     # torch.cuda.set_device(0)  # set your gpu device
     #model = Hitnet().cuda()
-    model = VisionMambaUNet(pretrained=True).cuda()
+    model = VisionMambaPVTUNet(pretrained=True).cuda()
 
     if opt.load is not None:
         pretrained_dict=torch.load(opt.load)
