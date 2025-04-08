@@ -1,10 +1,44 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from mamba_ssm import Mamba
 from huggingface_hub import hf_hub_download
-import torch.nn.functional as F
 from lib.pvtv2 import pvt_v2_b2
 
+# CBAM Attention Module
+class CBAM(nn.Module):
+    def __init__(self, channels, reduction=16):
+        super().__init__()
+        # Channel Attention
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.max_pool = nn.AdaptiveMaxPool2d(1)
+        self.fc = nn.Sequential(
+            nn.Conv2d(channels, channels // reduction, 1, bias=False),
+            nn.ReLU(),
+            nn.Conv2d(channels // reduction, channels, 1, bias=False)
+        )
+        self.sigmoid_channel = nn.Sigmoid()
+
+        # Spatial Attention
+        self.conv_spatial = nn.Conv2d(2, 1, kernel_size=7, padding=3, bias=False)
+        self.sigmoid_spatial = nn.Sigmoid()
+
+    def forward(self, x):
+        # Channel Attention
+        avg_out = self.fc(self.avg_pool(x))
+        max_out = self.fc(self.max_pool(x))
+        channel_attn = self.sigmoid_channel(avg_out + max_out)
+        x = x * channel_attn
+
+        # Spatial Attention
+        avg_out = torch.mean(x, dim=1, keepdim=True)
+        max_out, _ = torch.max(x, dim=1, keepdim=True)
+        spatial_attn = self.sigmoid_spatial(self.conv_spatial(torch.cat([avg_out, max_out], dim=1)))
+        x = x * spatial_attn
+
+        return x
+
+# Mamba Convolutional Block
 class MambaConvBlock(nn.Module):
     def __init__(self, in_channels, out_channels, stride=1):
         super().__init__()
@@ -33,14 +67,12 @@ class MambaConvBlock(nn.Module):
         x_mamba = F.interpolate(x_mamba, size=(H, W), mode='bilinear', align_corners=False)
         return F.relu(x_mamba + identity)
 
+# Attention Decoder Block with CBAM
 class AttentionDecoderBlock(nn.Module):
     def __init__(self, in_channels, out_channels):
         super().__init__()
         self.up = nn.ConvTranspose2d(in_channels, out_channels, kernel_size=2, stride=2)
-        self.attention = nn.Sequential(
-            nn.Conv2d(out_channels * 2, out_channels, kernel_size=1),
-            nn.Sigmoid()
-        )
+        self.cbam = CBAM(out_channels * 2)
         self.conv = nn.Sequential(
             nn.Conv2d(out_channels * 2, out_channels, kernel_size=3, padding=1, bias=False),
             nn.BatchNorm2d(out_channels),
@@ -52,16 +84,15 @@ class AttentionDecoderBlock(nn.Module):
 
     def forward(self, x, skip):
         x = self.up(x)
-        attn = self.attention(torch.cat([x, skip], dim=1))
-        skip = skip * attn
         x = torch.cat([x, skip], dim=1)
+        x = self.cbam(x)
         return self.conv(x)
 
+# Modelo Completo con Deep Supervision
 class VisionMambaPVTUNet(nn.Module):
-    def __init__(self, in_channels=3, features=[64, 128, 256, 512], pretrained=True):
+    def __init__(self, features=[64, 128, 256, 512], pretrained=True):
         super().__init__()
-        # Backbone PVT preentrenado
-        self.backbone = pvt_v2_b2()  # [64, 128, 320, 512]
+        self.backbone = pvt_v2_b2()
         path = './pretrained_pvt/pvt_v2_b2.pth'
         save_model = torch.load(path)
         model_dict = self.backbone.state_dict()
@@ -69,45 +100,44 @@ class VisionMambaPVTUNet(nn.Module):
         model_dict.update(state_dict)
         self.backbone.load_state_dict(model_dict)
 
-        # Extraer canales del backbone PVT
         pvt_channels = [64, 128, 320, 512]
 
-        # Bloques Mamba para procesar características del backbone
         self.enc1 = MambaConvBlock(pvt_channels[0], features[0])
         self.enc2 = MambaConvBlock(pvt_channels[1], features[1])
         self.enc3 = MambaConvBlock(pvt_channels[2], features[2])
         self.enc4 = MambaConvBlock(pvt_channels[3], features[3])
 
-        # Decoder con atención
         self.dec3 = AttentionDecoderBlock(features[3], features[2])
         self.dec2 = AttentionDecoderBlock(features[2], features[1])
         self.dec1 = AttentionDecoderBlock(features[1], features[0])
 
-        self.seg_head = nn.Conv2d(features[0], 1, kernel_size=1)
+        # Deep supervision heads
+        self.seg_head1 = nn.Conv2d(features[0], 1, kernel_size=1)
+        self.seg_head2 = nn.Conv2d(features[1], 1, kernel_size=1)
+        self.seg_head3 = nn.Conv2d(features[2], 1, kernel_size=1)
 
         if pretrained:
             self.load_pretrained_mamba_weights()
 
     def forward(self, x):
-        # Backbone PVT
-        pvt_feats = self.backbone.forward_features(x)
-        x1, x2, x3, x4 = pvt_feats  # características multi-escala del backbone
+        x1, x2, x3, x4 = self.backbone.forward_features(x)
 
-        # Encoder con Mamba
         e1 = self.enc1(x1)
         e2 = self.enc2(x2)
         e3 = self.enc3(x3)
         e4 = self.enc4(x4)
 
-        # Decoder con atención
         d3 = self.dec3(e4, e3)
         d2 = self.dec2(d3, e2)
         d1 = self.dec1(d2, e1)
 
-        out = F.interpolate(d1, scale_factor=4, mode='bilinear', align_corners=False)
-        out = self.seg_head(out)
+        out1 = F.interpolate(self.seg_head1(d1), scale_factor=4, mode='bilinear', align_corners=False)
+        out2 = F.interpolate(self.seg_head2(d2), scale_factor=8, mode='bilinear', align_corners=False)
+        out3 = F.interpolate(self.seg_head3(d3), scale_factor=16, mode='bilinear', align_corners=False)
 
-        return [out], out
+        final_out = (out1 + out2 + out3) / 3
+
+        return [out1, out2, out3], final_out
 
     def load_pretrained_mamba_weights(self):
         try:
@@ -117,29 +147,17 @@ class VisionMambaPVTUNet(nn.Module):
                 cache_dir="./pretrained_mamba"
             )
             pretrained_weights = torch.load(model_path, map_location='cpu')
-
             model_dict = self.state_dict()
-            matched_weights = {}
-
-            # Carga parcial solo para bloques Mamba internos
-            for name, param in pretrained_weights.items():
-                for model_name in model_dict.keys():
-                    if model_name.endswith(name) and param.shape == model_dict[model_name].shape:
-                        matched_weights[model_name] = param
-                        print(f"✅ Coincidencia encontrada: {model_name}")
-
+            matched_weights = {k: v for k, v in pretrained_weights.items() if k in model_dict and v.shape == model_dict[k].shape}
             model_dict.update(matched_weights)
             self.load_state_dict(model_dict, strict=False)
-
-            print(f"✅ Pesos pre-entrenados Mamba cargados parcialmente: {len(matched_weights)}/{len(model_dict)} capas coinciden.")
-
+            print(f"✅ Pesos Mamba cargados parcialmente: {len(matched_weights)} capas.")
         except Exception as e:
-            print(f"❌ Error cargando pesos pre-entrenados Mamba: {e}")
-            print("⚠️ Inicializando bloques Mamba con pesos aleatorios...")
+            print(f"❌ Error cargando pesos Mamba: {e}")
 
-# Ejemplo de uso:
+# Ejemplo de uso
 if __name__ == "__main__":
     model = VisionMambaPVTUNet(pretrained=True)
     x = torch.randn(1, 3, 256, 256)
-    preds, _ = model(x)
-    print(preds[0].shape)  # [1, 1, 256, 256]
+    outputs, final_output = model(x)
+    print(final_output.shape)  # [1, 1, 256, 256]
