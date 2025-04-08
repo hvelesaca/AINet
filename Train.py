@@ -31,8 +31,19 @@ def load_matched_state_dict(model, state_dict, print_stats=True):
     if print_stats:
         print(f'Loaded state_dict: {num_matched}/{num_total} matched')
 
-
 def structure_loss(pred, mask):
+    weit = 1 + 5 * torch.abs(F.avg_pool2d(mask, kernel_size=31, stride=1, padding=15) - mask)
+    wbce = F.binary_cross_entropy_with_logits(pred, mask, reduction='none')
+    wbce = (weit * wbce).sum(dim=(2, 3)) / weit.sum(dim=(2, 3))
+
+    pred = torch.sigmoid(pred)
+    inter = ((pred * mask) * weit).sum(dim=(2, 3))
+    union = ((pred + mask) * weit).sum(dim=(2, 3))
+    wiou = 1 - (inter + 1) / (union - inter + 1)
+
+    return (wbce + wiou).mean()
+
+def structure_loss_bad(pred, mask):
     weit = 1 + 5 * torch.abs(F.avg_pool2d(mask, kernel_size=31, stride=1, padding=15) - mask)
     wbce = F.binary_cross_entropy_with_logits(pred, mask, reduce='none')
     wbce = (weit * wbce).sum(dim=(2, 3)) / weit.sum(dim=(2, 3))
@@ -56,9 +67,6 @@ def val(model, epoch, save_path, writer):
         test_loader = test_dataset(image_root=opt.test_path + '/Imgs/',
                                    gt_root=opt.test_path + '/GT/',
                                    testsize=opt.trainsize)
-        #test_loader = test_dataset(image_root=opt.test_path + '/COD10K/Imgs/',
-        #                    gt_root=opt.test_path + '/COD10K/GT/',
-        #                    testsize=opt.trainsize)
 
         for i in range(test_loader.size):
             image, gt, name = test_loader.load_data()
@@ -117,7 +125,6 @@ def train(train_loader, model, optimizer, epoch, test_path):
             for it in range(len(P1)):
                 loss_p1 += (gamma * it) * losses[it]
 
-
             loss_P2 = structure_loss(P2, gts)
 
             loss = loss_p1 + loss_P2
@@ -151,16 +158,16 @@ if __name__ == '__main__':
 
     ###############################################
     parser = argparse.ArgumentParser()
-    parser.add_argument('--epoch', type=int,default=200, help='epoch number')
+    parser.add_argument('--epoch', type=int,default=100, help='epoch number')
     parser.add_argument('--lr', type=float,default=1e-4, help='learning rate')
     parser.add_argument('--optimizer', type=str,default='AdamW', help='choosing optimizer AdamW or SGD')
     parser.add_argument('--augmentation',default=True, help='choose to do random flip rotation')
-    parser.add_argument('--batchsize', type=int,default=16, help='training batch size')
+    parser.add_argument('--batchsize', type=int,default=20, help='training batch size')
     parser.add_argument('--trainsize', type=int,default=352, help='training dataset size,candidate=352,704,1056')
     parser.add_argument('--clip', type=float,default=0.5, help='gradient clipping margin')
     parser.add_argument('--load', type=str, default=None, help='train from checkpoints')
     parser.add_argument('--decay_rate', type=float,default=0.1, help='decay rate of learning rate')
-    parser.add_argument('--decay_epoch', type=int,default=50, help='every n epochs decay learning rate')
+    parser.add_argument('--decay_epoch', type=int,default=25, help='every n epochs decay learning rate')
     parser.add_argument('--train_path', type=str,default=f'../{dataset}/train',help='path to train dataset')
     parser.add_argument('--test_path', type=str,default=f'../{dataset}/val',help='path to testing dataset')
     parser.add_argument('--save_path', type=str,default=f'./model_pth/Hitnet_{dataset}/')
@@ -197,9 +204,9 @@ if __name__ == '__main__':
     params = model.parameters()
 
     if opt.optimizer == 'AdamW':
-        optimizer = torch.optim.AdamW(params, opt.lr, weight_decay=1e-4)
+        optimizer = torch.optim.AdamW(params, opt.lr, weight_decay=5e-4)
     else:
-        optimizer = torch.optim.SGD(params, opt.lr, weight_decay=1e-4, momentum=0.9)
+        optimizer = torch.optim.SGD(params, opt.lr, weight_decay=5e-4, momentum=0.9)
 
     #print(optimizer)
     image_root = '{}/Imgs/'.format(opt.train_path)
