@@ -6,7 +6,7 @@ from scipy import misc
 import cv2
 #from lib.pvt import Hitnet
 from utils.dataloader import My_test_dataset
-from lib.mamba_unet import VisionMambaUNet  # Añade esta línea
+from lib.mamba_unet import VisionMambaPVTUNet  # Añade esta línea
 
 
 parser = argparse.ArgumentParser()
@@ -20,7 +20,7 @@ for _data_name in ['CottonWorm4_Drive']:
     save_path = './results/{}/{}/'.format(opt.pth_path.split('/')[-2], _data_name)
     
     #model = Hitnet()
-    model = VisionMambaUNet(pretrained=True).cuda()
+    model = VisionMambaPVTUNet(pretrained=True).cuda()
 
     model.load_state_dict(torch.load(opt.pth_path))
     model.cuda()
