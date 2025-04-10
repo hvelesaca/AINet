@@ -11,7 +11,7 @@ import numpy as np
 import logging
 from tensorboardX import SummaryWriter
 import matplotlib.pyplot as plt
-from lib.mamba_unet import VisionMambaPVTUNet  # Añade esta línea
+from lib.mamba_unet import CamouflageDetectionNet  # Añade esta línea
 
 ####
 ####CUDA_VISIBLE_DEVICES=0 python3 Train.py
@@ -187,7 +187,7 @@ if __name__ == '__main__':
     # ---- build models ----
     # torch.cuda.set_device(0)  # set your gpu device
     #model = Hitnet().cuda()
-    model = VisionMambaPVTUNet(pretrained=True).cuda()
+    model = CamouflageDetectionNet(pretrained=True).cuda()
 
     if opt.load is not None:
         pretrained_dict=torch.load(opt.load)
@@ -204,9 +204,9 @@ if __name__ == '__main__':
     params = model.parameters()
 
     if opt.optimizer == 'AdamW':
-        optimizer = torch.optim.AdamW(params, opt.lr, weight_decay=5e-4)
+        optimizer = torch.optim.AdamW(params, opt.lr, weight_decay=1e-4)
     else:
-        optimizer = torch.optim.SGD(params, opt.lr, weight_decay=5e-4, momentum=0.9)
+        optimizer = torch.optim.SGD(params, opt.lr, weight_decay=1e-4, momentum=0.9)
 
     #print(optimizer)
     image_root = '{}/Imgs/'.format(opt.train_path)
