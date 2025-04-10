@@ -82,7 +82,7 @@ class AttentionDecoderBlock(nn.Module):
         return self.conv(x)
 
 # Modelo Completo con Deep Supervision
-class VisionMambaPVTUNet(nn.Module):
+class CamouflageDetectionNet(nn.Module):
     def __init__(self, features=[64, 128, 256, 512], pretrained=True):
         super().__init__()
         self.backbone = pvt_v2_b2()
@@ -104,9 +104,6 @@ class VisionMambaPVTUNet(nn.Module):
         self.seg_heads = nn.ModuleList([
             nn.Conv2d(features[i], 1, kernel_size=1) for i in range(3)
         ])
-
-        if pretrained:
-            self.load_pretrained_mamba_weights()
 
     def forward(self, x: torch.Tensor):
         skips = self.backbone.forward_features(x)
@@ -131,26 +128,10 @@ class VisionMambaPVTUNet(nn.Module):
         except Exception as e:
             print(f"❌ Error cargando pesos backbone: {e}")
 
-    def load_pretrained_mamba_weights(self):
-        try:
-            model_path = hf_hub_download(
-                repo_id="state-spaces/mamba-130m",
-                filename="pytorch_model.bin",
-                cache_dir="./pretrained_mamba"
-            )
-            pretrained_weights = torch.load(model_path, map_location='cpu')
-            model_dict = self.state_dict()
-            matched_weights = {k: v for k, v in pretrained_weights.items() if k in model_dict and v.shape == model_dict[k].shape}
-            model_dict.update(matched_weights)
-            self.load_state_dict(model_dict, strict=False)
-            print(f"✅ Pesos Mamba cargados parcialmente: {len(matched_weights)} capas.")
-        except Exception as e:
-            print(f"❌ Error cargando pesos Mamba: {e}")
-
 # Ejemplo de uso optimizado
 if __name__ == "__main__":
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model = VisionMambaPVTUNet(pretrained=True).to(device)
+    model = CamouflageDetectionNet(pretrained=True).to(device)
     model.eval()
     with torch.no_grad():
         x = torch.randn(1, 3, 256, 256).to(device)
