@@ -143,6 +143,12 @@ class CamouflageDetectionNet(nn.Module):
         self.encoder3 = MambaConvBlock(out_channels[2], features[2])
         self.encoder4 = MambaConvBlock(out_channels[3], features[3])
 
+        # --- CBAM después de cada encoder ---
+        self.cbam1 = CBAM(features[0])
+        self.cbam2 = CBAM(features[1])
+        self.cbam3 = CBAM(features[2])
+        self.cbam4 = CBAM(features[3])
+        
         # Canales de salida esperados del backbone pvt_v2_b2 en cada etapa
         #pvt_channels = [64, 128, 320, 512]
 
@@ -157,15 +163,33 @@ class CamouflageDetectionNet(nn.Module):
         self.seg_head2 = nn.Conv2d(features[1], 1, kernel_size=1) # Output from decoder2
         self.seg_head1 = nn.Conv2d(features[0], 1, kernel_size=1) # Output from decoder1
 
+        # --- Fusión jerárquica adaptativa ---
+        self.fusion_mlp = nn.Sequential(
+            nn.Conv2d(3, 8, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(8, 1, kernel_size=1)
+        )
+
     def forward(self, x: torch.Tensor):
         # --- Encoder ---
         skips = self.backbone.forward_features(x) # Obtener features del backbone [s1, s2, s3, s4]
 
+        # Procesar con encoder + CBAM
+        enc1_out = self.cbam1(self.encoder1(skips[0]))
+        enc2_out = self.cbam2(self.encoder2(skips[1]))
+        enc3_out = self.cbam3(self.encoder3(skips[2]))
+        enc4_out = self.cbam4(self.encoder4(skips[3]))
+        
         # Procesar skips con MambaConvBlocks
-        enc1_out = self.encoder1(skips[0])
-        enc2_out = self.encoder2(skips[1])
-        enc3_out = self.encoder3(skips[2])
-        enc4_out = self.encoder4(skips[3]) # Bottleneck feature
+        #enc1_out = self.encoder1(skips[0])
+        #enc2_out = self.encoder2(skips[1])
+        #enc3_out = self.encoder3(skips[2])
+        #enc4_out = self.encoder4(skips[3]) # Bottleneck feature
+
+        enc1_out = self.cbam1(self.encoder1(skips[0]))
+        enc2_out = self.cbam2(self.encoder2(skips[1]))
+        enc3_out = self.cbam3(self.encoder3(skips[2]))
+        enc4_out = self.cbam4(self.encoder4(skips[3]))
 
         # --- Decoder ---
         # Pasar la salida del encoder anterior y el skip correspondiente
@@ -181,7 +205,11 @@ class CamouflageDetectionNet(nn.Module):
         out1 = F.interpolate(self.seg_head1(dec1_out), size=x.shape[2:], mode='bilinear', align_corners=False)
 
         # Combinar las salidas (puedes elegir solo out1 o una combinación)
-        final_out = (out1 + out2 + out3) / 3 # Promedio 
+        #final_out = (out1 + out2 + out3) / 3 # Promedio 
+
+        # --- Fusión Jerárquica Aprendida ---
+        fusion_input = torch.cat([out1, out2, out3], dim=1)  # [B, 3, H, W]
+        final_out = self.fusion_mlp(fusion_input)  # [B, 1, H, W]
 
         # Devolver todas las salidas y la final combinada
         return [out1, out2, out3], final_out
