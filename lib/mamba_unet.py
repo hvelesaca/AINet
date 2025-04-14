@@ -130,12 +130,10 @@ class AttentionDecoderBlock(nn.Module):
 class CamouflageDetectionNet(nn.Module):
     def __init__(self, features=[64, 128, 256, 512], pretrained=True):
         super().__init__()
-        #self.backbone = pvt_v2_b2()
-        #if pretrained:
-            # Intenta cargar los pesos, maneja la excepción si falla
-        #    self._load_backbone_weights('./pretrained_pvt/pvt_v2_b2.pth') # Ajusta la ruta si es necesario
+        
+        #self.backbone = PVTBackbone("pvt_v2_b3", pretrained=True)
+        self.backbone = ConvNeXtBackbone("convnext_small", pretrained=True)
 
-        self.backbone = PVTBackbone("pvt_v2_b3", pretrained=True)
         out_channels = self.backbone.out_channels  # [96, 192, 384, 768]
 
         # --- Encoder Path ---
