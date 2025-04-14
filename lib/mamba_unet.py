@@ -105,6 +105,19 @@ class MambaConvBlock(nn.Module):
         x_mamba = F.interpolate(x_mamba, size=(H, W), mode='bilinear', align_corners=False)
         return F.relu(x_mamba + identity)
 
+class DecoderBlockWithMamba(nn.Module):
+    def __init__(self, in_channels: int, out_channels: int):
+        super().__init__()
+        self.up = nn.ConvTranspose2d(in_channels, out_channels, kernel_size=2, stride=2)
+        self.cbam = CBAM(out_channels * 2)
+        self.mamba = MambaConvBlock(out_channels * 2, out_channels)
+
+    def forward(self, x: torch.Tensor, skip: torch.Tensor) -> torch.Tensor:
+        x = self.up(x)
+        x = torch.cat([x, skip], dim=1)
+        x = self.cbam(x)
+        return self.mamba(x)
+
 # Attention Decoder Block with CBAM
 class AttentionDecoderBlock(nn.Module):
     def __init__(self, in_channels: int, out_channels: int):
@@ -126,8 +139,82 @@ class AttentionDecoderBlock(nn.Module):
         x = self.cbam(x)
         return self.conv(x)
 
-# Modelo Completo con Deep Supervision y estructura U-Net
 class CamouflageDetectionNet(nn.Module):
+    def __init__(self, features=[64, 128, 256, 512], pretrained=True):
+        super().__init__()
+        
+        self.backbone = PVTBackbone("pvt_v2_b2", pretrained=pretrained)
+        out_channels = self.backbone.out_channels  # [64, 128, 320, 512]
+
+        # --- Encoder Path ---
+        self.encoder1 = MambaConvBlock(out_channels[0], features[0])
+        self.encoder2 = MambaConvBlock(out_channels[1], features[1])
+        self.encoder3 = MambaConvBlock(out_channels[2], features[2])
+        self.encoder4 = MambaConvBlock(out_channels[3], features[3])
+
+        # --- CBAM después de cada encoder ---
+        self.cbam1 = CBAM(features[0])
+        self.cbam2 = CBAM(features[1])
+        self.cbam3 = CBAM(features[2])
+        self.cbam4 = CBAM(features[3])
+
+        # --- Bottleneck extra con Mamba ---
+        self.bottleneck_mamba = MambaConvBlock(features[3], features[3])
+
+        # --- Decoder Path con Mamba ---
+        self.decoder3 = DecoderBlockWithMamba(features[3], features[2])  # Up(enc4) + enc3
+        self.decoder2 = DecoderBlockWithMamba(features[2], features[1])  # Up(dec3) + enc2
+        self.decoder1 = DecoderBlockWithMamba(features[1], features[0])  # Up(dec2) + enc1
+
+        # --- Deep Supervision Heads ---
+        self.seg_head3 = nn.Conv2d(features[2], 1, kernel_size=1)
+        self.seg_head2 = nn.Conv2d(features[1], 1, kernel_size=1)
+        self.seg_head1 = nn.Conv2d(features[0], 1, kernel_size=1)
+
+        # --- Fusión jerárquica aprendida ---
+        self.fusion_mlp = nn.Sequential(
+            nn.Conv2d(3, 8, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(8, 1, kernel_size=1)
+        )
+
+        # --- Refinamiento final con Mamba ---
+        self.refine_mamba = MambaConvBlock(1, 1)
+
+    def forward(self, x: torch.Tensor):
+        # --- Encoder ---
+        skips = self.backbone.forward_features(x)
+
+        enc1_out = self.cbam1(self.encoder1(skips[0]))
+        enc2_out = self.cbam2(self.encoder2(skips[1]))
+        enc3_out = self.cbam3(self.encoder3(skips[2]))
+        enc4_out = self.cbam4(self.encoder4(skips[3]))
+
+        # --- Bottleneck ---
+        bottleneck = self.bottleneck_mamba(enc4_out)
+
+        # --- Decoder ---
+        dec3_out = self.decoder3(bottleneck, enc3_out)
+        dec2_out = self.decoder2(dec3_out, enc2_out)
+        dec1_out = self.decoder1(dec2_out, enc1_out)
+
+        # --- Deep Supervision Heads ---
+        out3 = F.interpolate(self.seg_head3(dec3_out), size=x.shape[2:], mode='bilinear', align_corners=False)
+        out2 = F.interpolate(self.seg_head2(dec2_out), size=x.shape[2:], mode='bilinear', align_corners=False)
+        out1 = F.interpolate(self.seg_head1(dec1_out), size=x.shape[2:], mode='bilinear', align_corners=False)
+
+        # --- Fusión Jerárquica ---
+        fusion_input = torch.cat([out1, out2, out3], dim=1)  # [B, 3, H, W]
+        final_out = self.fusion_mlp(fusion_input)            # [B, 1, H, W]
+
+        # --- Refinamiento final con Mamba ---
+        final_out = self.refine_mamba(final_out)
+
+        return [out1, out2, out3], final_out
+
+
+# Modelo Completo con Deep Supervision y estructura U-Net
+class CamouflageDetectionNet2(nn.Module):
     def __init__(self, features=[64, 128, 256, 512], pretrained=True):
         super().__init__()
         
