@@ -3,7 +3,52 @@ import torch.nn as nn
 import torch.nn.functional as F
 from mamba_ssm import Mamba
 from huggingface_hub import hf_hub_download
-from lib.pvtv2 import pvt_v2_b2
+import timm
+
+#convnextv2_base, convnextv2_small, convnextv2_tiny
+# ConvNeXt Tiny devuelve 4 features: [96, 192, 384, 768]
+# ConvNeXt Small devuelve 4 features: [96, 192, 384, 768]
+# ConvNeXt Base devuelve 4 features: [128, 256, 512, 1024]
+class ConvNeXtBackbone(nn.Module):
+    def __init__(self, model_name="convnext_base", pretrained=True):
+        super().__init__()
+        try:
+          self.backbone = timm.create_model(model_name, features_only=True, pretrained=pretrained)
+          print(f"Modelo {model_name} cargado exitosamente.")
+
+          self.out_channels = [f['num_chs'] for f in self.backbone.feature_info]
+          print(f"Canales de salida de {model_name}: {self.out_channels}")
+
+        except Exception as e:
+          print(f"Error al cargar {model_name}: {e}")
+          print("Asegúrate de tener 'timm' instalado y que el nombre del modelo sea correcto.")
+
+    def forward_features(self, x):
+        return self.backbone(x)
+        
+        
+#pvt_v2_variants = [#'pvt_v2_b0',#'pvt_v2_b1',#'pvt_v2_b2', # La que usaste#'pvt_v2_b3',#'pvt_v2_b4',#'pvt_v2_b5',#]
+class PVTBackbone(nn.Module):
+    def __init__(self, model_name="pvt_v2_b2", pretrained=True):
+        super().__init__()
+        
+        try:
+          # Crear el backbone usando timm
+          self.backbone = timm.create_model(model_name, features_only=True, pretrained=pretrained)# ¡Importante para obtener skips!
+          print(f"Modelo {model_name} cargado exitosamente.")
+
+          # Obtener los canales de salida (importante para conectar a los encoders)
+          #self.out_channels = [f['num_chs'] for f in self.backbone.feature_info]
+          self.out_channels = [64, 128, 320, 512]
+          print(f"Canales de salida de {model_name}: {self.out_channels}")
+
+        except Exception as e:
+          print(f"Error al cargar {model_name}: {e}")
+          print("Asegúrate de tener 'timm' instalado y que el nombre del modelo sea correcto.")
+
+    def forward_features(self, x):
+        return self.backbone(x)
+                
 
 # CBAM Attention Module
 class CBAM(nn.Module):
@@ -81,45 +126,68 @@ class AttentionDecoderBlock(nn.Module):
         x = self.cbam(x)
         return self.conv(x)
 
-# Modelo Completo con Deep Supervision
+# Modelo Completo con Deep Supervision y estructura U-Net
 class CamouflageDetectionNet(nn.Module):
     def __init__(self, features=[64, 128, 256, 512], pretrained=True):
         super().__init__()
-        self.backbone = pvt_v2_b2()
-        if pretrained:
-            self._load_backbone_weights('./pretrained_pvt/pvt_v2_b2.pth')
+        #self.backbone = pvt_v2_b2()
+        #if pretrained:
+            # Intenta cargar los pesos, maneja la excepción si falla
+        #    self._load_backbone_weights('./pretrained_pvt/pvt_v2_b2.pth') # Ajusta la ruta si es necesario
 
-        pvt_channels = [64, 128, 320, 512]
+        self.backbone = PVTBackbone("pvt_v2_b3", pretrained=True)
+        out_channels = self.backbone.out_channels  # [96, 192, 384, 768]
 
-        self.encoders = nn.ModuleList([
-            MambaConvBlock(pvt_channels[i], features[i]) for i in range(4)
-        ])
+        # --- Encoder Path ---
+        # Módulos Mamba que procesan las salidas del backbone
+        self.encoder1 = MambaConvBlock(out_channels[0], features[0])
+        self.encoder2 = MambaConvBlock(out_channels[1], features[1])
+        self.encoder3 = MambaConvBlock(out_channels[2], features[2])
+        self.encoder4 = MambaConvBlock(out_channels[3], features[3])
 
-        self.decoders = nn.ModuleList([
-            AttentionDecoderBlock(features[3], features[2]),
-            AttentionDecoderBlock(features[2], features[1]),
-            AttentionDecoderBlock(features[1], features[0])
-        ])
+        # Canales de salida esperados del backbone pvt_v2_b2 en cada etapa
+        #pvt_channels = [64, 128, 320, 512]
 
-        self.seg_heads = nn.ModuleList([
-            nn.Conv2d(features[i], 1, kernel_size=1) for i in range(3)
-        ])
+        # --- Decoder Path ---
+        # Módulos Decoder que reciben la salida del nivel anterior y el skip connection
+        self.decoder3 = AttentionDecoderBlock(features[3], features[2]) # Up(enc4) + enc3
+        self.decoder2 = AttentionDecoderBlock(features[2], features[1]) # Up(dec3) + enc2
+        self.decoder1 = AttentionDecoderBlock(features[1], features[0]) # Up(dec2) + enc1
+
+        # --- Segmentation Heads (Deep Supervision) ---
+        self.seg_head3 = nn.Conv2d(features[2], 1, kernel_size=1) # Output from decoder3
+        self.seg_head2 = nn.Conv2d(features[1], 1, kernel_size=1) # Output from decoder2
+        self.seg_head1 = nn.Conv2d(features[0], 1, kernel_size=1) # Output from decoder1
 
     def forward(self, x: torch.Tensor):
-        skips = self.backbone.forward_features(x)
-        enc_feats = [enc(skip) for enc, skip in zip(self.encoders, skips)]
+        # --- Encoder ---
+        skips = self.backbone.forward_features(x) # Obtener features del backbone [s1, s2, s3, s4]
 
-        d3 = self.decoders[0](enc_feats[3], enc_feats[2])
-        d2 = self.decoders[1](d3, enc_feats[1])
-        d1 = self.decoders[2](d2, enc_feats[0])
+        # Procesar skips con MambaConvBlocks
+        enc1_out = self.encoder1(skips[0])
+        enc2_out = self.encoder2(skips[1])
+        enc3_out = self.encoder3(skips[2])
+        enc4_out = self.encoder4(skips[3]) # Bottleneck feature
 
-        out1 = F.interpolate(self.seg_heads[0](d1), size=x.shape[2:], mode='bilinear', align_corners=False)
-        out2 = F.interpolate(self.seg_heads[1](d2), size=x.shape[2:], mode='bilinear', align_corners=False)
-        out3 = F.interpolate(self.seg_heads[2](d3), size=x.shape[2:], mode='bilinear', align_corners=False)
+        # --- Decoder ---
+        # Pasar la salida del encoder anterior y el skip correspondiente
+        dec3_out = self.decoder3(enc4_out, enc3_out) # Input: Bottleneck, Skip: Encoder 3 output
+        dec2_out = self.decoder2(dec3_out, enc2_out) # Input: Decoder 3 out, Skip: Encoder 2 output
+        dec1_out = self.decoder1(dec2_out, enc1_out) # Input: Decoder 2 out, Skip: Encoder 1 output
 
-        final_out = (out1 + out2 + out3) / 3
+        # --- Deep Supervision Heads ---
+        # Generar salidas de segmentación en diferentes niveles del decoder
+        # Interpolar todas a la dimensión de la entrada original
+        out3 = F.interpolate(self.seg_head3(dec3_out), size=x.shape[2:], mode='bilinear', align_corners=False)
+        out2 = F.interpolate(self.seg_head2(dec2_out), size=x.shape[2:], mode='bilinear', align_corners=False)
+        out1 = F.interpolate(self.seg_head1(dec1_out), size=x.shape[2:], mode='bilinear', align_corners=False)
+
+        # Combinar las salidas (puedes elegir solo out1 o una combinación)
+        final_out = (out1 + out2 + out3) / 3 # Promedio 
+
+        # Devolver todas las salidas y la final combinada
         return [out1, out2, out3], final_out
-
+    
     def _load_backbone_weights(self, path: str):
         try:
             state_dict = torch.load(path, map_location='cpu')
@@ -127,7 +195,7 @@ class CamouflageDetectionNet(nn.Module):
             print("✅ Pesos backbone cargados correctamente.")
         except Exception as e:
             print(f"❌ Error cargando pesos backbone: {e}")
-
+        
 # Ejemplo de uso optimizado
 if __name__ == "__main__":
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
