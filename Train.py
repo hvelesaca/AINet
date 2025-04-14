@@ -186,7 +186,6 @@ if __name__ == '__main__':
 
     # ---- build models ----
     # torch.cuda.set_device(0)  # set your gpu device
-    #model = Hitnet().cuda()
     model = CamouflageDetectionNet(pretrained=True).cuda()
 
     if opt.load is not None:
@@ -212,8 +211,7 @@ if __name__ == '__main__':
     image_root = '{}/Imgs/'.format(opt.train_path)
     gt_root = '{}/GT/'.format(opt.train_path)
 
-    train_loader = get_loader(image_root, gt_root, batchsize=opt.batchsize, trainsize=opt.trainsize,
-                              augmentation=opt.augmentation)
+    train_loader = get_loader(image_root, gt_root, batchsize=opt.batchsize, trainsize=opt.trainsize, augmentation=opt.augmentation)
     total_step = len(train_loader)
 
     writer = SummaryWriter(opt.save_path + 'summary')
@@ -222,7 +220,7 @@ if __name__ == '__main__':
     best_mae = 1
     best_epoch = 0
     for epoch in range(1, opt.epoch):
-        adjust_lr(optimizer, opt.lr, epoch, 0.1, 200)
+        adjust_lr(optimizer, opt.lr, epoch, 0.1, 25)
         train(train_loader, model, optimizer, epoch, opt.save_path)
         if epoch % opt.epoch_save==0:
-            val( model, epoch, opt.save_path, writer)
+            val(model, epoch, opt.save_path, writer)
