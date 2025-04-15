@@ -153,7 +153,7 @@ class AttentionDecoderBlock(nn.Module):
         x = self.cbam(x)
         return self.conv(x)
 
-class CamouflageDetectionNet2(nn.Module):
+class CamouflageDetectionNet(nn.Module):
     def __init__(self, features=[64, 128, 256, 512], pretrained=True):
         super().__init__()
         
@@ -225,7 +225,7 @@ class CamouflageDetectionNet2(nn.Module):
 
 
 # Modelo Completo con Deep Supervision y estructura U-Net
-class CamouflageDetectionNet(nn.Module):
+class CamouflageDetectionNet2(nn.Module):
     def __init__(self, features=[64, 128, 256, 512], pretrained=True, dropout_prob=0.2):
         super().__init__()
         
