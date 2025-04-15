@@ -256,6 +256,13 @@ class CamouflageDetectionNet2(nn.Module):
         self.seg_head2 = nn.Conv2d(features[1], 1, kernel_size=1) # Output from decoder2
         self.seg_head1 = nn.Conv2d(features[0], 1, kernel_size=1) # Output from decoder1
 
+        # Fusión jerárquica aprendida
+        self.fusion_mlp = nn.Sequential(
+            nn.Conv2d(in_channels=3, out_channels=8, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(in_channels=8, out_channels=1, kernel_size=1)
+        )
+
     def forward(self, x: torch.Tensor):
         # --- Encoder ---
         skips = self.backbone.forward_features(x) # Obtener features del backbone [s1, s2, s3, s4]
@@ -278,8 +285,12 @@ class CamouflageDetectionNet2(nn.Module):
         out2 = F.interpolate(self.seg_head2(dec2_out), size=x.shape[2:], mode='bilinear', align_corners=False)
         out1 = F.interpolate(self.seg_head1(dec1_out), size=x.shape[2:], mode='bilinear', align_corners=False)
 
+        # --- Fusión Jerárquica ---
+        fusion_input = torch.cat([out1, out2, out3], dim=1)  # [B, 3, H, W]
+        final_out = self.fusion_mlp(fusion_input)            # [B, 1, H, W]
+        
         # Combinar las salidas (puedes elegir solo out1 o una combinación)
-        final_out = (out1 + out2 + out3) / 3 # Promedio 
+        #final_out = (out1 + out2 + out3) / 3 # Promedio 
 
         # Devolver todas las salidas y la final combinada
         return [out1, out2, out3], final_out
