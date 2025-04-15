@@ -80,12 +80,13 @@ class CBAM(nn.Module):
 
 # Mamba Convolutional Block
 class MambaConvBlock(nn.Module):
-    def __init__(self, in_channels: int, out_channels: int, stride: int = 1, mamba_dim: int = 64):
+    def __init__(self, in_channels: int, out_channels: int, stride: int = 1, mamba_dim: int = 64, dropout_prob: float = 0.1):
         super().__init__()
         self.conv = nn.Sequential(
             nn.Conv2d(in_channels, out_channels, 3, stride, 1, bias=False),
             nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True)
+            nn.Dropout2d(p=dropout_prob) # <--- Dropout añadido aquí
         )
         self.pool = nn.AdaptiveAvgPool2d((16, 16))
         self.mamba = Mamba(d_model=out_channels, d_state=mamba_dim, d_conv=4, expand=2)
@@ -143,7 +144,7 @@ class DecoderBlockWithMamba(nn.Module):
 
 # Attention Decoder Block with CBAM
 class AttentionDecoderBlock(nn.Module):
-    def __init__(self, in_channels: int, out_channels: int):
+    def __init__(self, in_channels: int, out_channels: int, dropout_prob: float = 0.1):
         super().__init__()
         self.up = nn.ConvTranspose2d(in_channels, out_channels, 2, stride=2)
         self.cbam = CBAM(out_channels * 2)
@@ -154,6 +155,7 @@ class AttentionDecoderBlock(nn.Module):
             nn.Conv2d(out_channels, out_channels, 3, padding=1, bias=False),
             nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True)
+            nn.Dropout2d(p=dropout_prob) # <--- Dropout añadido aquí
         )
 
     def forward(self, x: torch.Tensor, skip: torch.Tensor) -> torch.Tensor:
@@ -184,9 +186,21 @@ class CamouflageDetectionNet2(nn.Module):
         self.seg_head1 = nn.Conv2d(features[0], 1, kernel_size=1)
 
         # Fusión jerárquica aprendida
+        #self.fusion_mlp = nn.Sequential(
+        #    nn.Conv2d(in_channels=3, out_channels=8, kernel_size=3, padding=1),
+        #    nn.ReLU(inplace=True),
+        #    nn.Conv2d(in_channels=8, out_channels=1, kernel_size=1)
+        #)
+        
+        # Fusión jerárquica aprendida
         self.fusion_mlp = nn.Sequential(
-            nn.Conv2d(in_channels=3, out_channels=8, kernel_size=3, padding=1),
+            # Capa 1: Convolución 3x3
+            nn.Conv2d(in_channels=len(self.seg_heads), out_channels=8, kernel_size=3, padding=1, bias=False),
+            # Capa 2: Normalización por Lotes
+            nn.BatchNorm2d(8),
+            # Capa 3: Activación ReLU
             nn.ReLU(inplace=True),
+            # Capa 4: Convolución 1x1 (Pointwise)
             nn.Conv2d(in_channels=8, out_channels=1, kernel_size=1)
         )
 
