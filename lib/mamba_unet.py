@@ -176,13 +176,9 @@ class CamouflageDetectionNet(nn.Module):
         
         # Fusión jerárquica aprendida
         self.fusion_mlp = nn.Sequential(
-            # Capa 1: Convolución 3x3
             nn.Conv2d(in_channels=3, out_channels=8, kernel_size=3, padding=1, bias=False),
-            # Capa 2: Normalización por Lotes
             nn.BatchNorm2d(8),
-            # Capa 3: Activación ReLU
             nn.ReLU(inplace=True),
-            # Capa 4: Convolución 1x1 (Pointwise)
             nn.Conv2d(in_channels=8, out_channels=1, kernel_size=1)
         )
 
@@ -197,9 +193,6 @@ class CamouflageDetectionNet(nn.Module):
         enc2_out = self.encoder2(skips[1])
         enc3_out = self.encoder3(skips[2])
         enc4_out = self.encoder4(skips[3])
-
-        # --- Bottleneck ---
-        #bottleneck = self.bottleneck_mamba(enc4_out)
 
         # --- Decoder ---
         dec3_out = self.decoder3(enc4_out, enc3_out)
