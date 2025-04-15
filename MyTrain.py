@@ -168,9 +168,9 @@ if __name__ == '__main__':
     parser.add_argument('--load', type=str, default=None, help='train from checkpoints')
     parser.add_argument('--decay_rate', type=float,default=0.1, help='decay rate of learning rate')
     parser.add_argument('--decay_epoch', type=int,default=25, help='every n epochs decay learning rate')
-    parser.add_argument('--train_path', type=str,default=f'../{dataset}/train',help='path to train dataset')
-    parser.add_argument('--test_path', type=str,default=f'../{dataset}/val',help='path to testing dataset')
-    parser.add_argument('--save_path', type=str,default=f'./model_pth/Hitnet_{dataset}/')
+    parser.add_argument('--train_path', type=str,default=f'{dataset}/train',help='path to train dataset')
+    parser.add_argument('--test_path', type=str,default=f'{dataset}/val',help='path to testing dataset')
+    parser.add_argument('--save_path', type=str,default=f'./model_pth/AIVGNet_{dataset}/')
     parser.add_argument('--epoch_save', type=int,default=5, help='every n epochs to save model')
     opt = parser.parse_args()
 
