@@ -183,11 +183,11 @@ class CamouflageDetectionNet(nn.Module):
         self.seg_head2 = nn.Conv2d(features[1], 1, kernel_size=1)
         self.seg_head1 = nn.Conv2d(features[0], 1, kernel_size=1)
 
-        # --- Fusión jerárquica aprendida ---
+        # Fusión jerárquica aprendida
         self.fusion_mlp = nn.Sequential(
-            nn.Conv2d(3, 8, kernel_size=3, padding=1),
+            nn.Conv2d(in_channels=3, out_channels=8, kernel_size=3, padding=1),
             nn.ReLU(inplace=True),
-            nn.Conv2d(8, 1, kernel_size=1)
+            nn.Conv2d(in_channels=8, out_channels=1, kernel_size=1)
         )
 
         # --- Refinamiento final con Mamba ---
