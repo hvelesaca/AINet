@@ -245,12 +245,6 @@ class CamouflageDetectionNet2(nn.Module):
         self.encoder3 = MambaConvBlock(out_channels[2], features[2])
         self.encoder4 = MambaConvBlock(out_channels[3], features[3])
 
-        # --- CBAM después de cada encoder ---
-        self.cbam1 = CBAM(features[0])
-        self.cbam2 = CBAM(features[1])
-        self.cbam3 = CBAM(features[2])
-        self.cbam4 = CBAM(features[3])
-
         # --- Decoder Path ---
         # Módulos Decoder que reciben la salida del nivel anterior y el skip connection
         self.decoder3 = AttentionDecoderBlock(features[3], features[2]) # Up(enc4) + enc3
