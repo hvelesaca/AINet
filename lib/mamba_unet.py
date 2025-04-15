@@ -86,7 +86,7 @@ class MambaConvBlock(nn.Module):
             nn.Conv2d(in_channels, out_channels, 3, stride, 1, bias=False),
             nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True),
-            nn.Dropout2d(p=dropout_prob) # <--- Dropout añadido aquí
+            #nn.Dropout2d(p=dropout_prob) # <--- Dropout añadido aquí
         )
         self.pool = nn.AdaptiveAvgPool2d((16, 16))
         self.mamba = Mamba(d_model=out_channels, d_state=mamba_dim, d_conv=4, expand=2)
@@ -113,8 +113,9 @@ class CBAM_MambaEncoderBlock(nn.Module):
         self.mamba_block = MambaConvBlock(in_channels, out_channels, mamba_dim=mamba_dim)
 
     def forward(self, x):
+        x = self.mamba_block(x)
         x = self.cbam(x)
-        return self.mamba_block(x)
+        return x
 
 class CBAM_MambaDecoderBlock(nn.Module):
     def __init__(self, in_channels, out_channels):
@@ -126,21 +127,9 @@ class CBAM_MambaDecoderBlock(nn.Module):
     def forward(self, x, skip):
         x = self.up(x)
         x = torch.cat([x, skip], dim=1)
+        x = self.mamba(x)
         x = self.cbam(x)
-        return self.mamba(x)
-        
-class DecoderBlockWithMamba(nn.Module):
-    def __init__(self, in_channels: int, out_channels: int):
-        super().__init__()
-        self.up = nn.ConvTranspose2d(in_channels, out_channels, kernel_size=2, stride=2)
-        self.cbam = CBAM(out_channels * 2)
-        self.mamba = MambaConvBlock(out_channels * 2, out_channels)
-
-    def forward(self, x: torch.Tensor, skip: torch.Tensor) -> torch.Tensor:
-        x = self.up(x)
-        x = torch.cat([x, skip], dim=1)
-        x = self.cbam(x)
-        return self.mamba(x)
+        return x
 
 # Attention Decoder Block with CBAM
 class AttentionDecoderBlock(nn.Module):
@@ -155,7 +144,7 @@ class AttentionDecoderBlock(nn.Module):
             nn.Conv2d(out_channels, out_channels, 3, padding=1, bias=False),
             nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True),
-            nn.Dropout2d(p=dropout_prob) # <--- Dropout añadido aquí
+            #nn.Dropout2d(p=dropout_prob) # <--- Dropout añadido aquí
         )
 
     def forward(self, x: torch.Tensor, skip: torch.Tensor) -> torch.Tensor:
@@ -184,13 +173,6 @@ class CamouflageDetectionNet2(nn.Module):
         self.seg_head3 = nn.Conv2d(features[2], 1, kernel_size=1)
         self.seg_head2 = nn.Conv2d(features[1], 1, kernel_size=1)
         self.seg_head1 = nn.Conv2d(features[0], 1, kernel_size=1)
-
-        # Fusión jerárquica aprendida
-        #self.fusion_mlp = nn.Sequential(
-        #    nn.Conv2d(in_channels=3, out_channels=8, kernel_size=3, padding=1),
-        #    nn.ReLU(inplace=True),
-        #    nn.Conv2d(in_channels=8, out_channels=1, kernel_size=1)
-        #)
         
         # Fusión jerárquica aprendida
         self.fusion_mlp = nn.Sequential(
