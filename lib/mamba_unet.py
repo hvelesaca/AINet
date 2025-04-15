@@ -85,7 +85,7 @@ class MambaConvBlock(nn.Module):
         self.conv = nn.Sequential(
             nn.Conv2d(in_channels, out_channels, 3, stride, 1, bias=False),
             nn.BatchNorm2d(out_channels),
-            nn.ReLU(inplace=True)
+            nn.ReLU(inplace=True),
             nn.Dropout2d(p=dropout_prob) # <--- Dropout añadido aquí
         )
         self.pool = nn.AdaptiveAvgPool2d((16, 16))
@@ -154,7 +154,7 @@ class AttentionDecoderBlock(nn.Module):
             nn.ReLU(inplace=True),
             nn.Conv2d(out_channels, out_channels, 3, padding=1, bias=False),
             nn.BatchNorm2d(out_channels),
-            nn.ReLU(inplace=True)
+            nn.ReLU(inplace=True),
             nn.Dropout2d(p=dropout_prob) # <--- Dropout añadido aquí
         )
 
