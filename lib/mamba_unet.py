@@ -248,7 +248,7 @@ class CamouflageDetectionNet(nn.Module):
         self.decoder1 = AttentionDecoderBlock(features[1], features[0]) # Up(dec2) + enc1
 
         # --- Segmentation Heads (Deep Supervision) ---
-        self.dropout = nn.Dropout2d(p=dropout_prob) # Capa de Dropout
+        #self.dropout = nn.Dropout2d(p=dropout_prob) # Capa de Dropout
         self.seg_head3 = nn.Conv2d(features[2], 1, kernel_size=1) # Output from decoder3
         self.seg_head2 = nn.Conv2d(features[1], 1, kernel_size=1) # Output from decoder2
         self.seg_head1 = nn.Conv2d(features[0], 1, kernel_size=1) # Output from decoder1
