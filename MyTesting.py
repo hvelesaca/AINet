@@ -15,8 +15,8 @@ parser.add_argument('--pth_path', type=str, default='/kaggle/input/hitnet_paper/
 
 opt = parser.parse_args()
 
-for _data_name in ['CottonWorm4_Drive']:
-    data_path = f'../{_data_name}/test'
+for _data_name in ['/kaggle/input/cottonworm4/CottonWorm4_Drive']:
+    data_path = f'{_data_name}/test'
     save_path = './results/{}/{}/'.format(opt.pth_path.split('/')[-2], _data_name)
     
     #model = Hitnet()
