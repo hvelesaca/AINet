@@ -159,12 +159,12 @@ class CamouflageDetectionNet(nn.Module):
         self.cbam4 = CBAM(features[3])
 
         # --- Bottleneck extra con Mamba ---
-        self.bottleneck_mamba = MambaConvBlock(features[3], features[3])
+        #self.bottleneck_mamba = MambaConvBlock(features[3], features[3])
 
         # --- Decoder Path con Mamba ---
-        self.decoder3 = DecoderBlockWithMamba(features[3], features[2])  # Up(enc4) + enc3
-        self.decoder2 = DecoderBlockWithMamba(features[2], features[1])  # Up(dec3) + enc2
-        self.decoder1 = DecoderBlockWithMamba(features[1], features[0])  # Up(dec2) + enc1
+        self.decoder3 = AttentionDecoderBlock(features[3], features[2])  # Up(enc4) + enc3
+        self.decoder2 = AttentionDecoderBlock(features[2], features[1])  # Up(dec3) + enc2
+        self.decoder1 = AttentionDecoderBlock(features[1], features[0])  # Up(dec2) + enc1
 
         # --- Deep Supervision Heads ---
         self.seg_head3 = nn.Conv2d(features[2], 1, kernel_size=1)
@@ -172,14 +172,14 @@ class CamouflageDetectionNet(nn.Module):
         self.seg_head1 = nn.Conv2d(features[0], 1, kernel_size=1)
 
         # --- Fusión jerárquica aprendida ---
-        self.fusion_mlp = nn.Sequential(
-            nn.Conv2d(3, 8, kernel_size=3, padding=1),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(8, 1, kernel_size=1)
-        )
+        #self.fusion_mlp = nn.Sequential(
+        #    nn.Conv2d(3, 8, kernel_size=3, padding=1),
+        #    nn.ReLU(inplace=True),
+        #    nn.Conv2d(8, 1, kernel_size=1)
+        #)
 
         # --- Refinamiento final con Mamba ---
-        self.refine_mamba = MambaConvBlock(1, 1)
+        #self.refine_mamba = MambaConvBlock(1, 1)
 
     def forward(self, x: torch.Tensor):
         # --- Encoder ---
@@ -191,10 +191,10 @@ class CamouflageDetectionNet(nn.Module):
         enc4_out = self.cbam4(self.encoder4(skips[3]))
 
         # --- Bottleneck ---
-        bottleneck = self.bottleneck_mamba(enc4_out)
+        #bottleneck = self.bottleneck_mamba(enc4_out)
 
         # --- Decoder ---
-        dec3_out = self.decoder3(bottleneck, enc3_out)
+        dec3_out = self.decoder3(enc4_out, enc3_out)
         dec2_out = self.decoder2(dec3_out, enc2_out)
         dec1_out = self.decoder1(dec2_out, enc1_out)
 
@@ -204,11 +204,14 @@ class CamouflageDetectionNet(nn.Module):
         out1 = F.interpolate(self.seg_head1(dec1_out), size=x.shape[2:], mode='bilinear', align_corners=False)
 
         # --- Fusión Jerárquica ---
-        fusion_input = torch.cat([out1, out2, out3], dim=1)  # [B, 3, H, W]
-        final_out = self.fusion_mlp(fusion_input)            # [B, 1, H, W]
+        #fusion_input = torch.cat([out1, out2, out3], dim=1)  # [B, 3, H, W]
+        #final_out = self.fusion_mlp(fusion_input)            # [B, 1, H, W]
+
+        # Combinar las salidas (puedes elegir solo out1 o una combinación)
+        final_out = (out1 + out2 + out3) / 3 # Promedio
 
         # --- Refinamiento final con Mamba ---
-        final_out = self.refine_mamba(final_out)
+        #final_out = self.refine_mamba(final_out)
 
         return [out1, out2, out3], final_out
 
