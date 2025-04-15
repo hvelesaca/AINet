@@ -244,7 +244,7 @@ class CamouflageDetectionNet2(nn.Module):
 
 # Modelo Completo con Deep Supervision y estructura U-Net
 class CamouflageDetectionNet(nn.Module):
-    def __init__(self, features=[64, 128, 256, 512], pretrained=True):
+    def __init__(self, features=[64, 128, 256, 512], pretrained=True, dropout_prob=0.2):
         super().__init__()
         
         self.backbone = PVTBackbone("pvt_v2_b2", pretrained=True)
