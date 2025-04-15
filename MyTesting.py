@@ -4,9 +4,8 @@ import numpy as np
 import os, argparse
 from scipy import misc
 import cv2
-#from lib.pvt import Hitnet
 from utils.dataloader import My_test_dataset
-from lib.mamba_unet import CamouflageDetectionNet  # Añade esta línea
+from lib.mamba_unet import CamouflageDetectionNet
 
 
 parser = argparse.ArgumentParser()
