@@ -201,14 +201,14 @@ class CamouflageDetectionNet2(nn.Module):
         out1 = F.interpolate(self.seg_head1(dec1_out), size=x.shape[2:], mode='bilinear', align_corners=False)
 
         # --- Fusión Jerárquica ---
-        fusion_input = torch.cat([out1, out2, out3], dim=1)  # [B, 3, H, W]
-        final_out = self.fusion_mlp(fusion_input)            # [B, 1, H, W]
+        #fusion_input = torch.cat([out1, out2, out3], dim=1)  # [B, 3, H, W]
+        #final_out = self.fusion_mlp(fusion_input)            # [B, 1, H, W]
 
         # Combinar las salidas (puedes elegir solo out1 o una combinación)
-        #final_out = (out1 + out2 + out3) / 3 # Promedio
+        final_out = (out1 + out2 + out3) / 3 # Promedio
 
         # --- Refinamiento final con Mamba ---
-        #final_out = self.refine_mamba(final_out)
+        final_out = self.refine_mamba(final_out)
 
         return [out1, out2, out3], final_out
 
