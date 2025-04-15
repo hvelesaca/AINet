@@ -80,13 +80,12 @@ class CBAM(nn.Module):
 
 # Mamba Convolutional Block
 class MambaConvBlock(nn.Module):
-    def __init__(self, in_channels: int, out_channels: int, stride: int = 1, mamba_dim: int = 64, dropout_prob: float = 0.1):
+    def __init__(self, in_channels: int, out_channels: int, stride: int = 1, mamba_dim: int = 64):
         super().__init__()
         self.conv = nn.Sequential(
             nn.Conv2d(in_channels, out_channels, 3, stride, 1, bias=False),
             nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True),
-            #nn.Dropout2d(p=dropout_prob) # <--- Dropout añadido aquí
         )
         self.pool = nn.AdaptiveAvgPool2d((16, 16))
         self.mamba = Mamba(d_model=out_channels, d_state=mamba_dim, d_conv=4, expand=2)
@@ -131,7 +130,7 @@ class CBAM_MambaDecoderBlock(nn.Module):
 
 # Attention Decoder Block with CBAM
 class AttentionDecoderBlock(nn.Module):
-    def __init__(self, in_channels: int, out_channels: int, dropout_prob: float = 0.1):
+    def __init__(self, in_channels: int, out_channels: int):
         super().__init__()
         self.up = nn.ConvTranspose2d(in_channels, out_channels, 2, stride=2)
         self.cbam = CBAM(out_channels * 2)
@@ -142,7 +141,6 @@ class AttentionDecoderBlock(nn.Module):
             nn.Conv2d(out_channels, out_channels, 3, padding=1, bias=False),
             nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True),
-            #nn.Dropout2d(p=dropout_prob) # <--- Dropout añadido aquí
         )
 
     def forward(self, x: torch.Tensor, skip: torch.Tensor) -> torch.Tensor:
@@ -217,7 +215,7 @@ class CamouflageDetectionNet2(nn.Module):
 
 # Modelo Completo con Deep Supervision y estructura U-Net
 class CamouflageDetectionNet(nn.Module):
-    def __init__(self, features=[64, 128, 320, 512], pretrained=True, dropout_prob=0.2):
+    def __init__(self, features=[64, 128, 320, 512], pretrained=True, dropout_prob=0.1):
         super().__init__()
         
         self.backbone = PVTBackbone("pvt_v2_b2", pretrained=True)
@@ -239,18 +237,18 @@ class CamouflageDetectionNet(nn.Module):
         self.decoder1 = AttentionDecoderBlock(features[1], features[0]) # Up(dec2) + enc1
 
         # --- Segmentation Heads (Deep Supervision) ---
-        self.dropout = nn.Dropout2d(p=dropout_prob) # Capa de Dropout
+        #self.dropout = nn.Dropout2d(p=dropout_prob) # Capa de Dropout
         self.seg_head3 = nn.Conv2d(features[2], 1, kernel_size=1) # Output from decoder3
         self.seg_head2 = nn.Conv2d(features[1], 1, kernel_size=1) # Output from decoder2
         self.seg_head1 = nn.Conv2d(features[0], 1, kernel_size=1) # Output from decoder1
         
         # Fusión jerárquica aprendida
-        #self.fusion_mlp = nn.Sequential(
-        #    nn.Conv2d(in_channels=3, out_channels=8, kernel_size=3, padding=1, bias=False),
-        #    nn.BatchNorm2d(8),
-        #    nn.ReLU(inplace=True),
-        #    nn.Conv2d(in_channels=8, out_channels=1, kernel_size=1)
-        #)
+        self.fusion_mlp = nn.Sequential(
+            nn.Conv2d(in_channels=3, out_channels=8, kernel_size=3, padding=1, bias=False),
+            nn.BatchNorm2d(8),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(in_channels=8, out_channels=1, kernel_size=1)
+        )
 
     def forward(self, x: torch.Tensor):
         # --- Encoder ---
@@ -269,9 +267,9 @@ class CamouflageDetectionNet(nn.Module):
 
         # --- Deep Supervision Heads ---
         # Aplicar Dropout antes de las cabezas de segmentación
-        dec1_out = self.dropout(dec1_out)
-        dec2_out = self.dropout(dec2_out)
-        dec3_out = self.dropout(dec3_out)
+        #dec1_out = self.dropout(dec1_out)
+        #dec2_out = self.dropout(dec2_out)
+        #dec3_out = self.dropout(dec3_out)
         
         # Generar salidas de segmentación en diferentes niveles del decoder
         # Interpolar todas a la dimensión de la entrada original
@@ -280,11 +278,11 @@ class CamouflageDetectionNet(nn.Module):
         out1 = F.interpolate(self.seg_head1(dec1_out), size=x.shape[2:], mode='bilinear', align_corners=False)
 
         # --- Fusión Jerárquica ---
-        #fusion_input = torch.cat([out1, out2, out3], dim=1)  # [B, 3, H, W]
-        #final_out = self.fusion_mlp(fusion_input)            # [B, 1, H, W]
+        fusion_input = torch.cat([out1, out2, out3], dim=1)  # [B, 3, H, W]
+        final_out = self.fusion_mlp(fusion_input)            # [B, 1, H, W]
         
         # Combinar las salidas (puedes elegir solo out1 o una combinación)
-        final_out = (out1 + out2 + out3) / 3 # Promedio 
+        #final_out = (out1 + out2 + out3) / 3 # Promedio 
 
         # Devolver todas las salidas y la final combinada
         return [out1, out2, out3], final_out
