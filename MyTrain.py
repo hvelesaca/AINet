@@ -158,7 +158,7 @@ if __name__ == '__main__':
 
     ###############################################
     parser = argparse.ArgumentParser()
-    parser.add_argument('--epoch', type=int,default=101, help='epoch number')
+    parser.add_argument('--epoch', type=int,default=201, help='epoch number')
     parser.add_argument('--lr', type=float,default=1e-4, help='learning rate')
     parser.add_argument('--optimizer', type=str,default='AdamW', help='choosing optimizer AdamW or SGD')
     parser.add_argument('--augmentation',default=True, help='choose to do random flip rotation')
