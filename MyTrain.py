@@ -153,8 +153,8 @@ def train(train_loader, model, optimizer, epoch, test_path):
 if __name__ == '__main__':
 
     ##################model_name#############################
-    # model_name = 'Hitnet_pvt_wo_pretrained_fusion'
-    dataset = 'CottonWorm4_Drive'
+    #dataset = 'CottonWorm4_Drive'
+    dataset = '/kaggle/input/cottonworm4/CottonWorm4_Drive'
 
     ###############################################
     parser = argparse.ArgumentParser()
