@@ -332,7 +332,7 @@ class CamouflageDetectionNet(nn.Module):
         final_out = (out1 + out2 + out3) / 3 # Promedio 
 
         # Devolver todas las salidas y la final combinada
-        return [out2, out3], out1
+        return [out1, out2, out3], final_out
     
     def _load_backbone_weights(self, path: str):
         try:
