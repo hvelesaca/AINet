@@ -43,19 +43,6 @@ def structure_loss(pred, mask):
 
     return (wbce + wiou).mean()
 
-def structure_loss_bad(pred, mask):
-    weit = 1 + 5 * torch.abs(F.avg_pool2d(mask, kernel_size=31, stride=1, padding=15) - mask)
-    wbce = F.binary_cross_entropy_with_logits(pred, mask, reduce='none')
-    wbce = (weit * wbce).sum(dim=(2, 3)) / weit.sum(dim=(2, 3))
-
-    pred = torch.sigmoid(pred)
-    inter = ((pred * mask) * weit).sum(dim=(2, 3))
-    union = ((pred + mask) * weit).sum(dim=(2, 3))
-    wiou = 1 - (inter + 1) / (union - inter + 1)
-
-    return (wbce + wiou).mean()
-
-
 def val(model, epoch, save_path, writer):
     """
     validation function
@@ -116,7 +103,7 @@ def train(train_loader, model, optimizer, epoch, test_path):
                 gts = F.upsample(gts, size=(trainsize, trainsize), mode='bilinear', align_corners=True)
             # ---- forward ----
             # print('this is trainsize',trainsize)
-            P1, P2= model(images)
+            P1, P2 = model(images)
             # ---- loss function ----
             losses = [structure_loss(out, gts) for out in P1]
             loss_p1=0
@@ -137,18 +124,12 @@ def train(train_loader, model, optimizer, epoch, test_path):
                 loss_P2_record.update(loss_P2.data, opt.batchsize)
         # ---- train visualization ----
         if i % 20 == 0 or i == total_step:
-            print('{} Epoch [{:03d}/{:03d}], Step [{:04d}/{:04d}], '
-                  ' lateral-5: {:0.4f}]'.
-                  format(datetime.now(), epoch, opt.epoch, i, total_step,
-                         loss_P2_record.show()))
-            logging.info('{} Epoch [{:03d}/{:03d}], Step [{:04d}/{:04d}], '
-                  ' lateral-5: {:0.4f}]'.
-                  format(datetime.now(), epoch, opt.epoch, i, total_step,
-                         loss_P2_record.show()))
+            print('{} Epoch [{:03d}/{:03d}], Step [{:04d}/{:04d}], ' ' lateral-5: {:0.4f}]'.format(datetime.now(), epoch, opt.epoch, i, total_step,loss_P2_record.show()))
+            logging.info('{} Epoch [{:03d}/{:03d}], Step [{:04d}/{:04d}], ' ' lateral-5: {:0.4f}]'.format(datetime.now(), epoch, opt.epoch, i, total_step, loss_P2_record.show()))
     # save model
     save_path = opt.save_path
     if epoch % opt.epoch_save == 0:
-        torch.save(model.state_dict(), save_path + str(epoch) + 'Hitnet-PVT.pth')
+        torch.save(model.state_dict(), save_path + str(epoch) + 'AIVGNet-PVT.pth')
     
 if __name__ == '__main__':
 
