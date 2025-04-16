@@ -265,8 +265,8 @@ class CamouflageDetectionNet2(nn.Module):
     def __init__(self, features=[64, 128, 256, 512], pretrained=True, dropout_prob=0.1):
         super().__init__()
         
-        #self.backbone = PVTBackbone("pvt_v2_b2", pretrained=True)
-        self.backbone = ConvNeXtBackbone("convnext_small", pretrained=True)
+        self.backbone = PVTBackbone("pvt_v2_b2", pretrained=True)
+        #self.backbone = ConvNeXtBackbone("convnext_small", pretrained=True)
 
         out_channels = self.backbone.out_channels  # [96, 192, 384, 768]
 
@@ -332,7 +332,7 @@ class CamouflageDetectionNet2(nn.Module):
         final_out = (out1 + out2 + out3) / 3 # Promedio 
 
         # Devolver todas las salidas y la final combinada
-        return [out1, out2, out3], final_out
+        return [out2, out3], out1
     
     def _load_backbone_weights(self, path: str):
         try:
