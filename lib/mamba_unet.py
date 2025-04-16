@@ -51,7 +51,7 @@ class PVTBackbone(nn.Module):
                 
 
 class CBAM2(nn.Module):
-    def __init__(self, channels, r):
+    def __init__(self, channels, reduction: int = 16):
         super(CBAM, self).__init__()
         self.channels = channels
         self.r = r
