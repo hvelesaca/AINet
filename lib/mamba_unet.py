@@ -262,11 +262,11 @@ class CamouflageDetectionNet2(nn.Module):
 
 # Modelo Completo con Deep Supervision y estructura U-Net
 class CamouflageDetectionNet(nn.Module):
-    def __init__(self, features=[64, 128, 320, 512], pretrained=True, dropout_prob=0.1):
+    def __init__(self, features=[64, 128, 256, 512], pretrained=True, dropout_prob=0.1):
         super().__init__()
         
-        self.backbone = PVTBackbone("pvt_v2_b2", pretrained=True)
-        #self.backbone = ConvNeXtBackbone("convnext_small", pretrained=True)
+        #self.backbone = PVTBackbone("pvt_v2_b2", pretrained=True)
+        self.backbone = ConvNeXtBackbone("convnext_small", pretrained=True)
 
         out_channels = self.backbone.out_channels  # [96, 192, 384, 768]
 
