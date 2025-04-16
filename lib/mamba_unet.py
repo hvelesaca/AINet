@@ -159,8 +159,8 @@ class CBAM_MambaEncoderBlock(nn.Module):
         self.mamba_block = MambaConvBlock(in_channels, out_channels, mamba_dim=mamba_dim)
 
     def forward(self, x):
-        x = self.mamba_block(x)
-        return self.cbam(x)
+        x = self.cbam(x)
+        return self.mamba_block(x)
 
 class CBAM_MambaDecoderBlock(nn.Module):
     def __init__(self, in_channels, out_channels):
@@ -172,8 +172,8 @@ class CBAM_MambaDecoderBlock(nn.Module):
     def forward(self, x, skip):
         x = self.up(x)
         x = torch.cat([x, skip], dim=1)
-        x = self.mamba_block(x)
-        return self.cbam(x)
+        x = self.cbam(x)
+        return self.mamba_block(x)
 
 # Attention Decoder Block with CBAM
 class AttentionDecoderBlock(nn.Module):
