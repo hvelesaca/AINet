@@ -196,7 +196,7 @@ class AttentionDecoderBlock(nn.Module):
         x = self.cbam(x)
         return self.conv(x)
 
-class CamouflageDetectionNet2(nn.Module):
+class CamouflageDetectionNet(nn.Module):
     def __init__(self, features=[64, 128, 256, 512], pretrained=True):
         super().__init__()
         
@@ -218,12 +218,12 @@ class CamouflageDetectionNet2(nn.Module):
         self.seg_head1 = nn.Conv2d(features[0], 1, kernel_size=1)
         
         # Fusión jerárquica aprendida
-        self.fusion_mlp = nn.Sequential(
-            nn.Conv2d(in_channels=3, out_channels=8, kernel_size=3, padding=1, bias=False),
-            nn.BatchNorm2d(8),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(in_channels=8, out_channels=1, kernel_size=1)
-        )
+        #self.fusion_mlp = nn.Sequential(
+        #    nn.Conv2d(in_channels=3, out_channels=8, kernel_size=3, padding=1, bias=False),
+        #    nn.BatchNorm2d(8),
+        #    nn.ReLU(inplace=True),
+        #    nn.Conv2d(in_channels=8, out_channels=1, kernel_size=1)
+        #)
 
         # --- Refinamiento final con Mamba ---
         #self.refine_mamba = MambaConvBlock(1, 1)
@@ -252,16 +252,16 @@ class CamouflageDetectionNet2(nn.Module):
         #final_out = self.fusion_mlp(fusion_input)            # [B, 1, H, W]
 
         # Combinar las salidas (puedes elegir solo out1 o una combinación)
-        final_out = (out1 + out2 + out3) / 3 # Promedio
+        #final_out = (out1 + out2 + out3) / 3 # Promedio
 
         # --- Refinamiento final con Mamba ---
         #final_out = self.refine_mamba(final_out)
 
-        return [out1, out2, out3], final_out
+        return [out2, out3], out1
 
 
 # Modelo Completo con Deep Supervision y estructura U-Net
-class CamouflageDetectionNet(nn.Module):
+class CamouflageDetectionNet2(nn.Module):
     def __init__(self, features=[64, 128, 256, 512], pretrained=True, dropout_prob=0.1):
         super().__init__()
         
