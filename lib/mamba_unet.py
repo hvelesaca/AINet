@@ -49,7 +49,7 @@ class PVTBackbone(nn.Module):
     def forward_features(self, x):
         return self.backbone(x)
                 
-
+#https://github.com/Peachypie98/CBAM
 class CBAM(nn.Module):
     def __init__(self, channels, reduction: int = 16):
         super(CBAM, self).__init__()
