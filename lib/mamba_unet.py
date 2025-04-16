@@ -54,7 +54,7 @@ class CBAM(nn.Module):
     def __init__(self, channels, reduction: int = 16):
         super(CBAM, self).__init__()
         self.channels = channels
-        self.r = r
+        self.r = reduction
         self.sam = SAM(bias=False)
         self.cam = CAM(channels=self.channels, r=self.r)
 
