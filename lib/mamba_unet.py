@@ -50,7 +50,7 @@ class PVTBackbone(nn.Module):
         return self.backbone(x)
                 
 
-class CBAM2(nn.Module):
+class CBAM(nn.Module):
     def __init__(self, channels, reduction: int = 16):
         super(CBAM, self).__init__()
         self.channels = channels
@@ -98,7 +98,7 @@ class SAM(nn.Module):
         return output 
         
 # CBAM Attention Module
-class CBAM(nn.Module):
+class CBAM2(nn.Module):
     def __init__(self, channels: int, reduction: int = 16):
         super().__init__()
         self.channel_attention = nn.Sequential(
