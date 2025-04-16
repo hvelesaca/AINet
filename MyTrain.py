@@ -69,7 +69,7 @@ def val(model, epoch, save_path, writer):
             combined_res = (res1 + res[1] + res[0] + res[-1]) / 3
 
             # eval Dice
-            res = F.upsample(combined_res, size=gt.shape, mode='bilinear', align_corners=False)
+            res = F.upsample(res1, size=gt.shape, mode='bilinear', align_corners=False)
             res = res.sigmoid().data.cpu().numpy().squeeze()
             res = (res - res.min()) / (res.max() - res.min() + 1e-8)
             mae_sum += np.sum(np.abs(res - gt)) * 1.0 / (gt.shape[0] * gt.shape[1])
