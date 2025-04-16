@@ -197,7 +197,7 @@ class AttentionDecoderBlock(nn.Module):
         return self.conv(x)
 
 class CamouflageDetectionNet2(nn.Module):
-    def __init__(self, features=[64, 128, 320, 512], pretrained=True):
+    def __init__(self, features=[64, 128, 256, 512], pretrained=True):
         super().__init__()
         
         self.backbone = PVTBackbone("pvt_v2_b2", pretrained=pretrained)
@@ -226,7 +226,7 @@ class CamouflageDetectionNet2(nn.Module):
         )
 
         # --- Refinamiento final con Mamba ---
-        self.refine_mamba = MambaConvBlock(1, 1)
+        #self.refine_mamba = MambaConvBlock(1, 1)
 
     def forward(self, x: torch.Tensor):
         # --- Encoder ---
@@ -255,7 +255,7 @@ class CamouflageDetectionNet2(nn.Module):
         final_out = (out1 + out2 + out3) / 3 # Promedio
 
         # --- Refinamiento final con Mamba ---
-        final_out = self.refine_mamba(final_out)
+        #final_out = self.refine_mamba(final_out)
 
         return [out1, out2, out3], final_out
 
