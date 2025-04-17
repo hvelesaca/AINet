@@ -196,7 +196,7 @@ class AttentionDecoderBlock(nn.Module):
         x = self.cbam(x)
         return self.conv(x)
 
-class CamouflageDetectionNet2(nn.Module):
+class CamouflageDetectionNetnn.Module):
     def __init__(self, features=[64, 128, 320, 512], pretrained=True):
         super().__init__()
         
@@ -218,12 +218,12 @@ class CamouflageDetectionNet2(nn.Module):
         self.seg_head1 = nn.Conv2d(features[0], 1, kernel_size=1)
         
         # Fusión jerárquica aprendida
-        self.fusion_mlp = nn.Sequential(
-            nn.Conv2d(in_channels=3, out_channels=8, kernel_size=3, padding=1, bias=False),
-            nn.BatchNorm2d(8),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(in_channels=8, out_channels=1, kernel_size=1)
-        )
+        #self.fusion_mlp = nn.Sequential(
+        #    nn.Conv2d(in_channels=3, out_channels=8, kernel_size=3, padding=1, bias=False),
+        #    nn.BatchNorm2d(8),
+        #    nn.ReLU(inplace=True),
+        #    nn.Conv2d(in_channels=8, out_channels=1, kernel_size=1)
+        #)
 
         # --- Refinamiento final con Mamba ---
         #self.refine_mamba = MambaConvBlock(1, 1)
@@ -261,7 +261,7 @@ class CamouflageDetectionNet2(nn.Module):
 
 
 # Modelo Completo con Deep Supervision y estructura U-Net
-class CamouflageDetectionNet(nn.Module):
+class CamouflageDetectionNet2(nn.Module):
     def __init__(self, features=[64, 128, 320, 512], pretrained=True):
         super().__init__()
         
