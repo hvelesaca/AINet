@@ -63,7 +63,7 @@ def val(model, epoch, save_path, writer):
             res, res1 = model(image)
             # Opción A: Suma
             #combined_res = res[-1] + res1 #Original 
-            combined_res = res[0] + res[-1] + res1 # out1 + out2 + out3
+            combined_res = res[-1] + res1 
             # Opción B: Promedio (conceptualmete similar a la suma por la normalización posterior)
             #combined_res = (res1 + res[1] + res[0] + res[-1]) / 3
 
@@ -153,7 +153,7 @@ if __name__ == '__main__':
     parser.add_argument('--clip', type=float,default=0.5, help='gradient clipping margin')
     parser.add_argument('--load', type=str, default=None, help='train from checkpoints')
     parser.add_argument('--decay_rate', type=float,default=1e-4, help='decay rate of learning rate')
-    parser.add_argument('--decay_epoch', type=int,default=10, help='every n epochs decay learning rate')
+    parser.add_argument('--decay_epoch', type=int,default=25, help='every n epochs decay learning rate')
     parser.add_argument('--train_path', type=str,default=f'{dataset}/train',help='path to train dataset')
     parser.add_argument('--test_path', type=str,default=f'{dataset}/val',help='path to testing dataset')
     parser.add_argument('--save_path', type=str,default=f'./model_pth/AIVGNet_{dataset}/')
