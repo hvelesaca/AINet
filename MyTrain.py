@@ -107,19 +107,19 @@ def train(train_loader, model, optimizer, epoch, test_path):
                 images = F.upsample(images, size=(trainsize, trainsize), mode='bilinear', align_corners=True)
                 gts = F.upsample(gts, size=(trainsize, trainsize), mode='bilinear', align_corners=True)
             # ---- forward ----
-            # print('this is trainsize',trainsize)
+            #print('this is trainsize',trainsize)
             P1, P2 = model(images)
             # ---- loss function ----
             losses = [structure_loss(out, gts) for out in P1]
-            loss_p1=0
-            gamma=0.2
-            # print('iteration num',len(P1))
+            loss_P1 = 0
+            gamma = 0.2
+            print('iteration num',len(P1))
             for it in range(len(P1)):
-                loss_p1 += (gamma * it) * losses[it]
+                loss_P1 += (gamma * it) * losses[it]
 
             loss_P2 = structure_loss(P2, gts)
 
-            loss = loss_p1 + loss_P2
+            loss = loss_P1 + loss_P2
             # ---- backward ----
             loss.backward()
             clip_gradient(optimizer, opt.clip)
