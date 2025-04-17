@@ -148,7 +148,7 @@ if __name__ == '__main__':
     parser.add_argument('--lr', type=float,default=1e-4, help='learning rate')
     parser.add_argument('--optimizer', type=str,default='AdamW', help='choosing optimizer AdamW or SGD')
     parser.add_argument('--augmentation',default=True, help='choose to do random flip rotation')
-    parser.add_argument('--batchsize', type=int,default=20, help='training batch size')
+    parser.add_argument('--batchsize', type=int,default=24, help='training batch size')
     parser.add_argument('--trainsize', type=int,default=352, help='training dataset size,candidate=352,704,1056')
     parser.add_argument('--clip', type=float,default=0.5, help='gradient clipping margin')
     parser.add_argument('--load', type=str, default=None, help='train from checkpoints')
