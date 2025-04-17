@@ -64,12 +64,12 @@ def val(model, epoch, save_path, writer):
             res, res1 = model(image)
             # Opción A: Suma
             #combined_res = res[-1] + res1 #Original 
-            #combined_res = res1 + res[0] + res[-1] # out1 + out2 + out3
+            combined_res = res1 + res[1] + res[0] + res[-1] # out1 + out2 + out3
             # Opción B: Promedio (conceptualmete similar a la suma por la normalización posterior)
-            combined_res = (res1 + res[1] + res[0] + res[-1]) / 3
+            #combined_res = (res1 + res[1] + res[0] + res[-1]) / 3
 
             # eval Dice
-            res = F.upsample(res1, size=gt.shape, mode='bilinear', align_corners=False)
+            res = F.upsample(combined_res, size=gt.shape, mode='bilinear', align_corners=False)
             res = res.sigmoid().data.cpu().numpy().squeeze()
             res = (res - res.min()) / (res.max() - res.min() + 1e-8)
             mae_sum += np.sum(np.abs(res - gt)) * 1.0 / (gt.shape[0] * gt.shape[1])
