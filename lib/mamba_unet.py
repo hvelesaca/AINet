@@ -196,7 +196,7 @@ class AttentionDecoderBlock(nn.Module):
         x = self.cbam(x)
         return self.conv(x)
 
-class CamouflageDetectionNetnn.Module):
+class CamouflageDetectionNet(nn.Module):
     def __init__(self, features=[64, 128, 320, 512], pretrained=True):
         super().__init__()
         
