@@ -63,7 +63,7 @@ def val(model, epoch, save_path, writer):
             res, res1 = model(image)
             # Opción A: Suma
             #combined_res = res[-1] + res1 #Original 
-            combined_res = res[-1] + res1 
+            combined_res = res[1] + res[0] + res[-1] + res1 
             # Opción B: Promedio (conceptualmete similar a la suma por la normalización posterior)
             #combined_res = (res1 + res[1] + res[0] + res[-1]) / 3
 
