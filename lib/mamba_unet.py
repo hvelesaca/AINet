@@ -262,7 +262,7 @@ class CamouflageDetectionNet2(nn.Module):
 
 # Modelo Completo con Deep Supervision y estructura U-Net
 class CamouflageDetectionNet(nn.Module):
-    def __init__(self, features=[64, 128, 256, 512], pretrained=True, dropout_prob=0.1):
+    def __init__(self, features=[64, 128, 256, 512], pretrained=True):
         super().__init__()
         
         self.backbone = PVTBackbone("pvt_v2_b2", pretrained=True)
@@ -288,15 +288,7 @@ class CamouflageDetectionNet(nn.Module):
         self.seg_head3 = nn.Conv2d(features[2], 1, kernel_size=1) # Output from decoder3
         self.seg_head2 = nn.Conv2d(features[1], 1, kernel_size=1) # Output from decoder2
         self.seg_head1 = nn.Conv2d(features[0], 1, kernel_size=1) # Output from decoder1
-        
-        # Fusión jerárquica aprendida
-        #self.fusion_mlp = nn.Sequential(
-        #    nn.Conv2d(in_channels=3, out_channels=8, kernel_size=3, padding=1, bias=False),
-        #    nn.BatchNorm2d(8),
-        #    nn.ReLU(inplace=True),
-        #    nn.Conv2d(in_channels=8, out_channels=1, kernel_size=1)
-        #)
-
+       
     def forward(self, x: torch.Tensor):
         # --- Encoder ---
         skips = self.backbone.forward_features(x) # Obtener features del backbone [s1, s2, s3, s4]
@@ -311,12 +303,6 @@ class CamouflageDetectionNet(nn.Module):
         dec3_out = self.decoder3(enc4_out, enc3_out) # Input: Bottleneck, Skip: Encoder 3 output
         dec2_out = self.decoder2(dec3_out, enc2_out) # Input: Decoder 3 out, Skip: Encoder 2 output
         dec1_out = self.decoder1(dec2_out, enc1_out) # Input: Decoder 2 out, Skip: Encoder 1 output
-
-        # --- Deep Supervision Heads ---
-        # Aplicar Dropout antes de las cabezas de segmentación
-        #dec1_out = self.dropout(dec1_out)
-        #dec2_out = self.dropout(dec2_out)
-        #dec3_out = self.dropout(dec3_out)
         
         # Generar salidas de segmentación en diferentes niveles del decoder
         # Interpolar todas a la dimensión de la entrada original
@@ -324,10 +310,6 @@ class CamouflageDetectionNet(nn.Module):
         out2 = F.interpolate(self.seg_head2(dec2_out), size=x.shape[2:], mode='bilinear', align_corners=False)
         out1 = F.interpolate(self.seg_head1(dec1_out), size=x.shape[2:], mode='bilinear', align_corners=False)
 
-        # --- Fusión Jerárquica ---
-        #fusion_input = torch.cat([out1, out2, out3], dim=1)  # [B, 3, H, W]
-        #final_out = self.fusion_mlp(fusion_input)            # [B, 1, H, W]
-        
         # Combinar las salidas (puedes elegir solo out1 o una combinación)
         final_out = (out1 + out2 + out3) / 3 # Promedio 
 
