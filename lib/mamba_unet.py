@@ -50,7 +50,7 @@ class PVTBackbone(nn.Module):
         return self.backbone(x)
                 
 #https://github.com/Peachypie98/CBAM
-class CBAM(nn.Module):
+class CBAM2(nn.Module):
     def __init__(self, channels, reduction: int = 16):
         super(CBAM, self).__init__()
         self.channels = channels
@@ -98,7 +98,7 @@ class SAM(nn.Module):
         return output 
         
 # CBAM Attention Module
-class CBAM2(nn.Module):
+class CBAM(nn.Module):
     def __init__(self, channels: int, reduction: int = 16):
         super().__init__()
         self.channel_attention = nn.Sequential(
@@ -196,6 +196,32 @@ class AttentionDecoderBlock(nn.Module):
         x = self.cbam(x)
         return self.conv(x)
 
+# Ejemplo de Bloque Encoder Alternativo (Mamba -> CBAM)
+class Mamba_CBAMEncoderBlock(nn.Module):
+    def __init__(self, in_channels, out_channels, mamba_dim=64):
+        super().__init__()
+        self.mamba_block = MambaConvBlock(in_channels, out_channels, mamba_dim=mamba_dim)
+        self.cbam = CBAM(out_channels) # CBAM sobre la salida de Mamba
+
+    def forward(self, x):
+        x = self.mamba_block(x)
+        return self.cbam(x) # Aplicar CBAM después
+
+# Ejemplo de Bloque Decoder Alternativo (Conv -> CBAM)
+class Mamba_CBAMDecoderBlock(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super().__init__()
+        self.up = nn.ConvTranspose2d(in_channels, out_channels, kernel_size=2, stride=2)
+        # Combinar skip y upsample ANTES de la convolución principal
+        self.conv_block = MambaConvBlock(out_channels * 2, out_channels) # O un bloque convolucional estándar
+        self.cbam = CBAM(out_channels) # CBAM sobre la salida del bloque principal
+
+    def forward(self, x, skip):
+        x = self.up(x)
+        x = torch.cat([x, skip], dim=1)
+        x = self.conv_block(x) # Procesamiento principal
+        return self.cbam(x)    # Refinamiento con CBAM
+
 class CamouflageDetectionNet(nn.Module):
     def __init__(self, features=[64, 128, 320, 512], pretrained=True):
         super().__init__()
@@ -203,14 +229,14 @@ class CamouflageDetectionNet(nn.Module):
         self.backbone = PVTBackbone("pvt_v2_b2", pretrained=pretrained)
         out_channels = self.backbone.out_channels  # [64, 128, 320, 512]
 
-        self.encoder1 = CBAM_MambaEncoderBlock(out_channels[0], features[0])
-        self.encoder2 = CBAM_MambaEncoderBlock(out_channels[1], features[1])
-        self.encoder3 = CBAM_MambaEncoderBlock(out_channels[2], features[2])
-        self.encoder4 = CBAM_MambaEncoderBlock(out_channels[3], features[3])
+        self.encoder1 = Mamba_CBAMEncoderBlock(out_channels[0], features[0])
+        self.encoder2 = Mamba_CBAMEncoderBlock(out_channels[1], features[1])
+        self.encoder3 = Mamba_CBAMEncoderBlock(out_channels[2], features[2])
+        self.encoder4 = Mamba_CBAMEncoderBlock(out_channels[3], features[3])
 
-        self.decoder3 = CBAM_MambaDecoderBlock(features[3], features[2])
-        self.decoder2 = CBAM_MambaDecoderBlock(features[2], features[1])
-        self.decoder1 = CBAM_MambaDecoderBlock(features[1], features[0])
+        self.decoder3 = Mamba_CBAMDecoderBlock(features[3], features[2])
+        self.decoder2 = Mamba_CBAMDecoderBlock(features[2], features[1])
+        self.decoder1 = Mamba_CBAMDecoderBlock(features[1], features[0])
         
         # --- Deep Supervision Heads ---
         self.seg_head3 = nn.Conv2d(features[2], 1, kernel_size=1)
@@ -218,12 +244,12 @@ class CamouflageDetectionNet(nn.Module):
         self.seg_head1 = nn.Conv2d(features[0], 1, kernel_size=1)
         
         # Fusión jerárquica aprendida
-        #self.fusion_mlp = nn.Sequential(
-        #    nn.Conv2d(in_channels=3, out_channels=8, kernel_size=3, padding=1, bias=False),
-        #    nn.BatchNorm2d(8),
-        #    nn.ReLU(inplace=True),
-        #    nn.Conv2d(in_channels=8, out_channels=1, kernel_size=1)
-        #)
+        self.fusion_mlp = nn.Sequential(
+            nn.Conv2d(in_channels=3, out_channels=8, kernel_size=3, padding=1, bias=False),
+            nn.BatchNorm2d(8),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(in_channels=8, out_channels=1, kernel_size=1)
+        )
 
         # --- Refinamiento final con Mamba ---
         #self.refine_mamba = MambaConvBlock(1, 1)
@@ -248,11 +274,11 @@ class CamouflageDetectionNet(nn.Module):
         out1 = F.interpolate(self.seg_head1(dec1_out), size=x.shape[2:], mode='bilinear', align_corners=False)
 
         # --- Fusión Jerárquica ---
-        #fusion_input = torch.cat([out1, out2, out3], dim=1)  # [B, 3, H, W]
-        #final_out = self.fusion_mlp(fusion_input)            # [B, 1, H, W]
+        fusion_input = torch.cat([out1, out2, out3], dim=1)  # [B, 3, H, W]
+        final_out = self.fusion_mlp(fusion_input)            # [B, 1, H, W]
 
         # Combinar las salidas (puedes elegir solo out1 o una combinación)
-        final_out = (out1 + out2 + out3) / 3 # Promedio
+        #final_out = (out1 + out2 + out3) / 3 # Promedio
 
         # --- Refinamiento final con Mamba ---
         #final_out = self.refine_mamba(final_out)
