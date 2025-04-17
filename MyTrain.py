@@ -145,15 +145,15 @@ if __name__ == '__main__':
     ###############################################
     parser = argparse.ArgumentParser()
     parser.add_argument('--epoch', type=int,default=201, help='epoch number')
-    parser.add_argument('--lr', type=float,default=1e-4, help='learning rate')
+    parser.add_argument('--lr', type=float,default=1e-3, help='learning rate')
     parser.add_argument('--optimizer', type=str,default='AdamW', help='choosing optimizer AdamW or SGD')
     parser.add_argument('--augmentation',default=True, help='choose to do random flip rotation')
     parser.add_argument('--batchsize', type=int,default=24, help='training batch size')
     parser.add_argument('--trainsize', type=int,default=352, help='training dataset size,candidate=352,704,1056')
     parser.add_argument('--clip', type=float,default=0.5, help='gradient clipping margin')
     parser.add_argument('--load', type=str, default=None, help='train from checkpoints')
-    parser.add_argument('--decay_rate', type=float,default=0.1, help='decay rate of learning rate')
-    parser.add_argument('--decay_epoch', type=int,default=25, help='every n epochs decay learning rate')
+    parser.add_argument('--decay_rate', type=float,default=1e-3, help='decay rate of learning rate')
+    parser.add_argument('--decay_epoch', type=int,default=10, help='every n epochs decay learning rate')
     parser.add_argument('--train_path', type=str,default=f'{dataset}/train',help='path to train dataset')
     parser.add_argument('--test_path', type=str,default=f'{dataset}/val',help='path to testing dataset')
     parser.add_argument('--save_path', type=str,default=f'./model_pth/AIVGNet_{dataset}/')
@@ -206,7 +206,7 @@ if __name__ == '__main__':
     best_mae = 1
     best_epoch = 0
     for epoch in range(1, opt.epoch):
-        adjust_lr(optimizer, opt.lr, epoch, 0.1, 25)
+        adjust_lr(optimizer, opt.lr, epoch, opt.decay_rate, opt.decay_epoch)
         train(train_loader, model, optimizer, epoch, opt.save_path)
         if epoch % opt.epoch_save==0:
             val(model, epoch, opt.save_path, writer)
