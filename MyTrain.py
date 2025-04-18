@@ -91,7 +91,7 @@ def lovasz_grad(gt_sorted):
         jaccard[1:p] = jaccard[1:p] - jaccard[0:-1]
     return jaccard
     
-def structure_loss(pred, mask):
+def structure_loss2(pred, mask):
     # Weighted BCE
     weit = 1 + 5 * torch.abs(F.avg_pool2d(mask, kernel_size=31, stride=1, padding=15) - mask)
     wbce = F.binary_cross_entropy_with_logits(pred, mask, reduction='none')
@@ -108,7 +108,7 @@ def structure_loss(pred, mask):
 
     return (wbce + wiou).mean() + lovasz
     
-def structure_lossAnt(pred, mask):
+def structure_loss(pred, mask):
     weit = 1 + 5 * torch.abs(F.avg_pool2d(mask, kernel_size=31, stride=1, padding=15) - mask)
     wbce = F.binary_cross_entropy_with_logits(pred, mask, reduction='none')
     wbce = (weit * wbce).sum(dim=(2, 3)) / weit.sum(dim=(2, 3))
