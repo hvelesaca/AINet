@@ -146,7 +146,7 @@ def val(model, epoch, save_path, writer):
             #combined_res = (res1 + res[1] + res[0] + res[-1]) / 3
 
             # eval Dice
-            res = F.interpolate(res_for_eval, size=gt.shape, mode='bilinear', align_corners=False) # Usar gt.shape[-2:] para obtener H, W
+            res = F.interpolate(combined_res, size=gt.shape, mode='bilinear', align_corners=False) # Usar gt.shape[-2:] para obtener H, W
             #res = F.upsample(combined_res, size=gt.shape, mode='bilinear', align_corners=False)
             res = res.sigmoid().data.cpu().numpy().squeeze()
             res = (res - res.min()) / (res.max() - res.min() + 1e-8)
