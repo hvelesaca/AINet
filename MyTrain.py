@@ -30,6 +30,18 @@ def load_matched_state_dict(model, state_dict, print_stats=True):
     if print_stats:
         print(f'Loaded state_dict: {num_matched}/{num_total} matched')
 
+def flatten_binary_scores(scores, labels):
+    """
+    Flattens predictions and labels for binary classification.
+    Removes pixels with label -1 (optional ignore label).
+    """
+    scores = scores.view(-1)
+    labels = labels.view(-1)
+    valid = (labels != -1)
+    vscores = scores[valid]
+    vlabels = labels[valid]
+    return vscores, vlabels
+    
 def lovasz_hinge(logits, labels, per_image=True):
     """
     Binary Lovasz hinge loss
