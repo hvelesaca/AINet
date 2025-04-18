@@ -171,6 +171,8 @@ def train(train_loader, model, optimizer, epoch, test_path):
     global best
     size_rates = [1]
     loss_P2_record = AvgMeter()
+    loss_P1_record = AvgMeter()
+    
     for i, pack in enumerate(train_loader, start=1):
         for rate in size_rates:
             optimizer.zero_grad()
@@ -205,10 +207,12 @@ def train(train_loader, model, optimizer, epoch, test_path):
             # ---- recording loss ----
             if rate == 1:
                 loss_P2_record.update(loss_P2.data, opt.batchsize)
+                loss_P1_record.update(loss_P1.data, opt.batchsize)
+                
         # ---- train visualization ----
         if i % 20 == 0 or i == total_step:
-            print('{} Epoch [{:03d}/{:03d}], Step [{:04d}/{:04d}], ' ' lateral-5: {:0.4f}]'.format(datetime.now(), epoch, opt.epoch, i, total_step,loss_P2_record.show()))
-            logging.info('{} Epoch [{:03d}/{:03d}], Step [{:04d}/{:04d}], ' ' lateral-5: {:0.4f}]'.format(datetime.now(), epoch, opt.epoch, i, total_step, loss_P2_record.show()))
+            print('{} Epoch [{:03d}/{:03d}], Step [{:04d}/{:04d}], Loss P1: {:0.4f}, Loss P2: {:0.4f}]'.format(datetime.now(), epoch, opt.epoch, i, total_step,loss_P1_record.show(),loss_P2_record.show()))
+            logging.info('{} Epoch [{:03d}/{:03d}], Step [{:04d}/{:04d}], Loss P1: {:0.4f}, Loss P2: {:0.4f}]'.format(datetime.now(), epoch, opt.epoch, i, total_step, loss_P1_record.show(),loss_P2_record.show()))
     # save model
     save_path = opt.save_path
     if epoch % opt.epoch_save == 0:
