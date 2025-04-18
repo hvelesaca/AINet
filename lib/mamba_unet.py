@@ -222,7 +222,7 @@ class Mamba_CBAMDecoderBlock(nn.Module):
         x = self.conv_block(x) # Procesamiento principal
         return self.cbam(x)    # Refinamiento con CBAM
 
-class CamouflageDetectionNet(nn.Module):
+class CamouflageDetectionNet2(nn.Module):
     def __init__(self, features=[64, 128, 320, 512], pretrained=True):
         super().__init__()
         
@@ -287,8 +287,8 @@ class CamouflageDetectionNet(nn.Module):
 
 
 # Modelo Completo con Deep Supervision y estructura U-Net
-class CamouflageDetectionNet2(nn.Module):
-    def __init__(self, features=[64, 128, 320, 512], pretrained=True):
+class CamouflageDetectionNet(nn.Module):
+    def __init__(self, features=[64, 128, 256, 512], pretrained=True):
         super().__init__()
         
         self.backbone = PVTBackbone("pvt_v2_b2", pretrained=True)
