@@ -139,7 +139,7 @@ def val(model, epoch, save_path, writer):
             image = image.cuda()
 
             res, res1 = model(image)
-            combined_res = res1 
+            combined_res = res[1] + res[-1] + res1 
             
             # Opción A: Suma
             #combined_res = res1 #Original             
@@ -197,7 +197,7 @@ def train(train_loader, model, optimizer, epoch, test_path):
             gamma = 0.25
             #print('iteration num',len(P1))
             for it in range(len(P1)):
-                loss_P1 += (gamma * (it+1)) * losses[it]
+                loss_P1 += (gamma * it) * losses[it]
 
             loss_P2 = structure_loss(P2, gts)
 
