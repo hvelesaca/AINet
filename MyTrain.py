@@ -139,7 +139,7 @@ def val(model, epoch, save_path, writer):
             image = image.cuda()
 
             res, res1 = model(image)
-            combined_res = res[-1] + res1 
+            combined_res = res1 
             
             # Opción A: Suma
             #combined_res = res1 #Original             
