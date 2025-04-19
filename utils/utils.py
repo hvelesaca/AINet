@@ -16,32 +16,48 @@ def clip_gradient(optimizer, grad_clip):
             if param.grad is not None:
                 param.grad.data.clamp_(-grad_clip, grad_clip)
 
-def adjust_lr(optimizer, init_lr, epoch, decay_rate=0.1, decay_epoch=30):
+import torch # Asegúrate de tener torch importado si usas esta función aisladamente
+
+def adjust_lr(optimizer, init_lr, epoch, decay_rate=0.1, decay_epoch=30, min_lr=1e-6):
     """
-    Ajusta el learning rate del optimizador basado en un esquema de decaimiento por pasos.
+    Ajusta el learning rate del optimizador basado en un esquema de decaimiento por pasos,
+    asegurando que no caiga por debajo de un valor mínimo.
 
     Args:
         optimizer (torch.optim.Optimizer): El optimizador cuyos learning rates se ajustarán.
         init_lr (float): El learning rate inicial.
-        epoch (int): El número de la época actual (empezando desde 1).
+        epoch (int): El número de la época actual (se asume que empieza desde 1).
         decay_rate (float): El factor por el cual decae el learning rate (e.g., 0.1 para reducir 10x).
         decay_epoch (int): La frecuencia (en épocas) con la que ocurre el decaimiento.
+        min_lr (float): El learning rate mínimo permitido. El LR no bajará de este valor.
     """
     # Calcula cuántas veces debería haber ocurrido el decaimiento hasta esta época
-    # Nota: Si epoch=30, exponente=1. Si epoch=59, exponente=1. Si epoch=60, exponente=2.
-    exponent = (epoch -1) // decay_epoch # Usar epoch-1 si las épocas empiezan en 1
+    # Si epoch=1, exponente=0. Si epoch=decay_epoch, exponente=0.
+    # Si epoch=decay_epoch+1, exponente=1.
+    # Se usa (epoch - 1) asumiendo que la primera época es epoch=1.
+    exponent = (epoch - 1) // decay_epoch
 
     # Calcula el nuevo learning rate objetivo basado en el inicial y el decaimiento
-    new_lr = init_lr * (decay_rate ** exponent)
+    calculated_lr = init_lr * (decay_rate ** exponent)
+
+    # --- Cambio Principal: Aplicar el learning rate mínimo ---
+    # Asegura que el learning rate no sea menor que min_lr
+    new_lr = max(calculated_lr, min_lr)
+    # --------------------------------------------------------
 
     # Establece el nuevo learning rate en todos los grupos de parámetros del optimizador
+    lr_changed = False
     for param_group in optimizer.param_groups:
-        # Es buena idea verificar si realmente cambió para evitar operaciones innecesarias
-        # y facilitar el logging si solo quieres imprimir cuando cambia.
         if param_group['lr'] != new_lr:
             param_group['lr'] = new_lr
-            # Opcional: Imprimir solo cuando cambia
-            # print(f"Epoch {epoch}: Learning rate ajustado a {new_lr:.6f}")
+            lr_changed = True
+
+    # Opcional: Imprimir solo cuando el LR realmente cambia
+    if lr_changed:
+        print(f"Epoch {epoch}: Learning rate ajustado a {new_lr:.8f}") # Usar más decimales para LR bajos
+
+    # Puedes devolver el nuevo LR si quieres usarlo fuera de la función
+    # return new_lr
 
 def adjust_lr2(optimizer, init_lr, epoch, decay_rate=0.1, decay_epoch=30):
     decay = decay_rate ** (epoch // decay_epoch)
