@@ -164,9 +164,7 @@ def val(model, epoch, save_path, writer):
                 best_epoch = epoch
                 torch.save(model.state_dict(), save_path + 'Net_epoch_best.pth')
                 print('Save state_dict successfully! Best epoch:{}.'.format(epoch))
-        logging.info(
-            '[Val Info]:Epoch:{} MAE:{} bestEpoch:{} bestMAE:{}'.format(epoch, mae, best_epoch, best_mae))
-
+        logging.info('[Val Info]:Epoch:{} MAE:{} bestEpoch:{} bestMAE:{}'.format(epoch, mae, best_epoch, best_mae))
 
 def train(train_loader, model, optimizer, epoch, test_path):
     model.train()
@@ -291,6 +289,11 @@ if __name__ == '__main__':
     best_epoch = 0
     for epoch in range(1, opt.epoch):
         adjust_lr(optimizer, opt.lr, epoch, opt.decay_rate, opt.decay_epoch)
+        # Acceder al learning rate actual desde el optimizador
+        current_lr = optimizer.param_groups[0]['lr']
+        print(f"\n--- Epoch {epoch}/{opt.epoch-1}, Current Learning Rate: {current_lr:.6f} ---") # Añadido \n para espaciado
+        logging.info(f"--- Epoch {epoch}/{opt.epoch-1}, Current Learning Rate: {current_lr:.6f} ---")
+        
         train(train_loader, model, optimizer, epoch, opt.save_path)
         if epoch % opt.epoch_save==0:
             val(model, epoch, opt.save_path, writer)
