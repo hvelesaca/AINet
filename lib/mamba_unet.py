@@ -223,7 +223,7 @@ class Mamba_CBAMDecoderBlock(nn.Module):
         return self.cbam(x)    # Refinamiento con CBAM
 
 class CamouflageDetectionNet(nn.Module):
-    def __init__(self, features=[64, 128, 320, 512], pretrained=True):
+    def __init__(self, features=[64, 128, 320, 512], pretrained=True, dropout_prob=0.1):
         super().__init__()
         
         self.backbone = PVTBackbone("pvt_v2_b2", pretrained=pretrained)
@@ -237,6 +237,11 @@ class CamouflageDetectionNet(nn.Module):
         self.decoder3 = Mamba_CBAMDecoderBlock(features[3], features[2])
         self.decoder2 = Mamba_CBAMDecoderBlock(features[2], features[1])
         self.decoder1 = Mamba_CBAMDecoderBlock(features[1], features[0])
+
+        # --- Capa de Dropout ---
+        # Usar nn.Dropout2d para mapas de características
+        # Se aplicará antes de cada seg_head si dropout_prob > 0
+        self.dropout = nn.Dropout2d(p=dropout_prob) if dropout_prob > 0 else nn.Identity()
         
         # --- Deep Supervision Heads ---
         self.seg_head3 = nn.Conv2d(features[2], 1, kernel_size=1)
@@ -267,6 +272,12 @@ class CamouflageDetectionNet(nn.Module):
         dec3_out = self.decoder3(enc4_out, enc3_out)
         dec2_out = self.decoder2(dec3_out, enc2_out)
         dec1_out = self.decoder1(dec2_out, enc1_out)
+
+        # --- Aplicar Dropout ANTES de las cabezas de segmentación ---
+        # Dropout solo se activa durante model.train()
+        dec3_out = self.dropout(dec3_out)
+        dec2_out = self.dropout(dec2_out)
+        dec1_out = self.dropout(dec1_out)
 
         # --- Deep Supervision Heads ---
         out3 = F.interpolate(self.seg_head3(dec3_out), size=x.shape[2:], mode='bilinear', align_corners=False)
