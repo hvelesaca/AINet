@@ -212,8 +212,8 @@ def train(train_loader, model, optimizer, epoch, test_path):
                 
         # ---- train visualization ----
         if i % 20 == 0 or i == total_step:
-            print('{} Epoch [{:03d}/{:03d}], Step [{:04d}/{:04d}], Loss P1: [{:0.4f}], Loss P2: [{:0.4f}]'.format(datetime.now(), epoch, opt.epoch, i, total_step,loss_P1_record.show(),loss_P2_record.show()))
-            logging.info('{} Epoch [{:03d}/{:03d}], Step [{:04d}/{:04d}], Loss P1: [{:0.4f}], Loss P2: [{:0.4f}]'.format(datetime.now(), epoch, opt.epoch, i, total_step, loss_P1_record.show(),loss_P2_record.show()))
+            print('{} Epoch [{:03d}/{:03d}], Step [{:04d}/{:04d}], Loss P2: [{:0.4f}]'.format(datetime.now(), epoch, opt.epoch, i, total_step,loss_P2_record.show()))
+            logging.info('{} Epoch [{:03d}/{:03d}], Step [{:04d}/{:04d}], Loss P2: [{:0.4f}]'.format(datetime.now(), epoch, opt.epoch, i, total_step,loss_P2_record.show()))
     # save model
     save_path = opt.save_path
     if epoch % opt.epoch_save == 0:
