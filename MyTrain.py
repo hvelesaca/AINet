@@ -146,8 +146,8 @@ def val(model, epoch, save_path, writer):
             #combined_res = (res1 + res[1] + res[0] + res[-1]) / 3
 
             # eval Dice
-            #res = F.interpolate(combined_res, size=gt.shape[-2:], mode='bilinear', align_corners=False) # Usar gt.shape[-2:] para obtener H, W
-            res = F.upsample(combined_res, size=gt.shape, mode='bilinear', align_corners=False)
+            res = F.interpolate(combined_res, size=gt.shape[-2:], mode='bilinear', align_corners=False) # Usar gt.shape[-2:] para obtener H, W
+            #res = F.upsample(combined_res, size=gt.shape, mode='bilinear', align_corners=False)
             res = res.sigmoid().data.cpu().numpy().squeeze()
             res = (res - res.min()) / (res.max() - res.min() + 1e-8)
             mae_sum += np.sum(np.abs(res - gt)) * 1.0 / (gt.shape[0] * gt.shape[1])
@@ -172,7 +172,7 @@ def train(train_loader, model, optimizer, epoch, test_path):
     global best
     size_rates = [1]
     loss_P2_record = AvgMeter()
-    loss_P1_record = AvgMeter()
+    #loss_P1_record = AvgMeter()
     
     for i, pack in enumerate(train_loader, start=1):
         for rate in size_rates:
