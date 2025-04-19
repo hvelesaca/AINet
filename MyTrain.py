@@ -291,8 +291,8 @@ if __name__ == '__main__':
         adjust_lr(optimizer, opt.lr, epoch, opt.decay_rate, opt.decay_epoch)
         # Acceder al learning rate actual desde el optimizador
         current_lr = optimizer.param_groups[0]['lr']
-        print(f"\n--- Epoch {epoch}/{opt.epoch-1}, Current Learning Rate: {current_lr:.6f} ---") # Añadido \n para espaciado
-        logging.info(f"--- Epoch {epoch}/{opt.epoch-1}, Current Learning Rate: {current_lr:.6f} ---")
+        print(f"\n--- Epoch {epoch}/{opt.epoch-1}, Current Learning Rate: {current_lr:.12f} ---") # Añadido \n para espaciado
+        logging.info(f"--- Epoch {epoch}/{opt.epoch-1}, Current Learning Rate: {current_lr:.12f} ---")
         
         train(train_loader, model, optimizer, epoch, opt.save_path)
         if epoch % opt.epoch_save==0:
