@@ -243,7 +243,7 @@ class CamouflageDetectionNet(nn.Module):
         # --- Capa de Dropout ---
         # Usar nn.Dropout2d para mapas de características
         # Se aplicará antes de cada seg_head si dropout_prob > 0
-        self.dropout = nn.Dropout2d(p=dropout_prob) if dropout_prob > 0 else nn.Identity()
+        #self.dropout = nn.Dropout2d(p=dropout_prob) if dropout_prob > 0 else nn.Identity()
         
         # --- Deep Supervision Heads ---
         self.seg_head3 = nn.Conv2d(features[2], 1, kernel_size=1)
@@ -277,9 +277,9 @@ class CamouflageDetectionNet(nn.Module):
 
         # --- Aplicar Dropout ANTES de las cabezas de segmentación ---
         # Dropout solo se activa durante model.train()
-        dec3_out = self.dropout(dec3_out)
-        dec2_out = self.dropout(dec2_out)
-        dec1_out = self.dropout(dec1_out)
+        #dec3_out = self.dropout(dec3_out)
+        #dec2_out = self.dropout(dec2_out)
+        #dec1_out = self.dropout(dec1_out)
 
         # --- Deep Supervision Heads ---
         out3 = F.interpolate(self.seg_head3(dec3_out), size=x.shape[2:], mode='bilinear', align_corners=False)
