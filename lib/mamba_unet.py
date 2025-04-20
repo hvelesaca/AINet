@@ -226,7 +226,7 @@ class CamouflageDetectionNet(nn.Module):
     def __init__(self, features=[64, 128, 320, 512], pretrained=True, dropout_prob=0.1):
         super().__init__()
         
-        self.backbone = PVTBackbone("pvt_v2_b2", pretrained=pretrained)
+        self.backbone = PVTBackbone("convnext_base", pretrained=pretrained)
         out_channels = self.backbone.out_channels  # [64, 128, 320, 512]
 
         self.encoder1 = Mamba_CBAMEncoderBlock(out_channels[0], features[0])
