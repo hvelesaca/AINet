@@ -12,6 +12,9 @@ from tensorboardX import SummaryWriter
 import matplotlib.pyplot as plt
 from lib.mamba_unet import CamouflageDetectionNet  # Añade esta línea
 
+#delaited convolution
+#lovasz_hinge
+
 ####
 ####CUDA_VISIBLE_DEVICES=0 python3 Train.py
 ####
