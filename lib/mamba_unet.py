@@ -156,7 +156,7 @@ class CBAM_MambaEncoderBlock(nn.Module):
     def __init__(self, in_channels, out_channels, mamba_dim=64):
         super().__init__()
         self.cbam = CBAM(in_channels)
-        self.mamba_block = (in_channels, out_channels, mamba_dim=mamba_dim)
+        self.mamba_block = MambaConvBlock(in_channels, out_channels, mamba_dim=mamba_dim)
 
     def forward(self, x):
         x = self.cbam(x)
