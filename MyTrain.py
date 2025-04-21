@@ -238,7 +238,7 @@ if __name__ == '__main__':
     parser.add_argument('--clip', type=float,default=0.5, help='gradient clipping margin')
     parser.add_argument('--load', type=str, default=None, help='train from checkpoints')
     parser.add_argument('--decay_rate', type=float,default=0.1, help='decay rate of learning rate')
-    parser.add_argument('--decay_epoch', type=int,default=20, help='every n epochs decay learning rate')
+    parser.add_argument('--decay_epoch', type=int,default=30, help='every n epochs decay learning rate')
     parser.add_argument('--train_path', type=str,default=f'{dataset}/train',help='path to train dataset')
     parser.add_argument('--test_path', type=str,default=f'{dataset}/val',help='path to testing dataset')
     parser.add_argument('--save_path', type=str,default=f'./model_pth/AIVGNet_{dataset}/')
