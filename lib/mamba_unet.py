@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from mamba_ssm import Mamba
+from mamba_ssm import Mamba2
 from huggingface_hub import hf_hub_download
 import timm
 
@@ -135,7 +135,7 @@ class MambaConvBlock(nn.Module):
             nn.ReLU(inplace=True),
         )
         self.pool = nn.AdaptiveAvgPool2d((16, 16))
-        self.mamba = Mamba(d_model=out_channels, d_state=mamba_dim, d_conv=4, expand=2)
+        self.mamba = Mamba2(d_model=out_channels, d_state=mamba_dim, d_conv=4, expand=2)
         self.residual = nn.Identity()
         if stride != 1 or in_channels != out_channels:
             self.residual = nn.Sequential(
@@ -156,7 +156,7 @@ class CBAM_MambaEncoderBlock(nn.Module):
     def __init__(self, in_channels, out_channels, mamba_dim=64):
         super().__init__()
         self.cbam = CBAM(in_channels)
-        self.mamba_block = MambaConvBlock(in_channels, out_channels, mamba_dim=mamba_dim)
+        self.mamba_block = (in_channels, out_channels, mamba_dim=mamba_dim)
 
     def forward(self, x):
         x = self.cbam(x)
@@ -301,7 +301,7 @@ class CamouflageDetectionNet2(nn.Module):
 
 # Modelo Completo con Deep Supervision y estructura U-Net
 class CamouflageDetectionNet(nn.Module):
-    def __init__(self, features=[64, 128, 256, 512], pretrained=True):
+    def __init__(self, features=[64, 128, 320, 512], pretrained=True):
         super().__init__()
         
         self.backbone = PVTBackbone("pvt_v2_b2", pretrained=True)
