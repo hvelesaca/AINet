@@ -142,7 +142,7 @@ def val(model, epoch, save_path, writer):
             image = image.cuda()
 
             res, res1 = model(image)
-            combined_res = res[1] + res[-1] + res1 
+            combined_res = res1 
             
             # Opción A: Suma
             #combined_res = res1 #Original             
@@ -237,7 +237,7 @@ if __name__ == '__main__':
     parser.add_argument('--trainsize', type=int,default=352, help='training dataset size,candidate=352,704,1056')
     parser.add_argument('--clip', type=float,default=0.5, help='gradient clipping margin')
     parser.add_argument('--load', type=str, default=None, help='train from checkpoints')
-    parser.add_argument('--decay_rate', type=float,default=0.01, help='decay rate of learning rate')
+    parser.add_argument('--decay_rate', type=float,default=0.1, help='decay rate of learning rate')
     parser.add_argument('--decay_epoch', type=int,default=20, help='every n epochs decay learning rate')
     parser.add_argument('--train_path', type=str,default=f'{dataset}/train',help='path to train dataset')
     parser.add_argument('--test_path', type=str,default=f'{dataset}/val',help='path to testing dataset')
@@ -291,12 +291,7 @@ if __name__ == '__main__':
     best_mae = 1
     best_epoch = 0
     for epoch in range(1, opt.epoch):
-        adjust_lr(optimizer, opt.lr, epoch, opt.decay_rate, opt.decay_epoch)
-        # Acceder al learning rate actual desde el optimizador
-        #current_lr = optimizer.param_groups[0]['lr']
-        #print(f"Epoch {epoch}/{opt.epoch-1}, Current Learning Rate: {current_lr:.12f} ---") # Añadido \n para espaciado
-        #logging.info(f"--- Epoch {epoch}/{opt.epoch-1}, Current Learning Rate: {current_lr:.12f} ---")
-        
+        adjust_lr(optimizer, opt.lr, epoch, opt.decay_rate, opt.decay_epoch)        
         train(train_loader, model, optimizer, epoch, opt.save_path)
         if epoch % opt.epoch_save==0:
             val(model, epoch, opt.save_path, writer)
