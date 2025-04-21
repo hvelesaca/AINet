@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from mamba_ssm import Mamba2
+from mamba_ssm import Mamba
 from huggingface_hub import hf_hub_download
 import timm
 
@@ -135,7 +135,7 @@ class MambaConvBlock(nn.Module):
             nn.ReLU(inplace=True),
         )
         self.pool = nn.AdaptiveAvgPool2d((16, 16))
-        self.mamba = Mamba2(d_model=out_channels, d_state=mamba_dim, d_conv=4, expand=2)
+        self.mamba = Mamba(d_model=out_channels, d_state=mamba_dim, d_conv=4, expand=2)
         self.residual = nn.Identity()
         if stride != 1 or in_channels != out_channels:
             self.residual = nn.Sequential(
