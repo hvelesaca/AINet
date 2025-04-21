@@ -127,7 +127,7 @@ class CBAM(nn.Module):
 
 # Mamba Convolutional Block
 class MambaConvBlock(nn.Module):
-    def __init__(self, in_channels: int, out_channels: int, stride: int = 1, mamba_dim: int = 64):
+    def __init__(self, in_channels: int, out_channels: int, stride: int = 1, mamba_dim: int = 128):
         super().__init__()
         self.conv = nn.Sequential(
             nn.Conv2d(in_channels, out_channels, 3, stride, 1, bias=False),
