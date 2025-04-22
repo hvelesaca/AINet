@@ -219,7 +219,7 @@ class CBAMOrin(nn.Module):
         return x * spatial_attn
 
 # Mamba Convolutional Block
-class MambaConvBlockAnt(nn.Module):
+class MambaConvBlock(nn.Module):
     def __init__(self, in_channels: int, out_channels: int, stride: int = 1, mamba_dim: int = 64):
         super().__init__()
         self.conv = nn.Sequential(
@@ -272,7 +272,7 @@ class CBAM3(nn.Module):
         spatial_attn = self.spatial_attention(torch.cat([avg_out, max_out], dim=1))
         return x * spatial_attn
 
-class MambaConvBlock(nn.Module):
+class MambaConvBlockPRELU(nn.Module):
     def __init__(self, in_channels: int, out_channels: int, stride: int = 1, mamba_dim: int = 64):
         super().__init__()
         self.prelu = nn.PReLU()
