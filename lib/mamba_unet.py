@@ -331,12 +331,12 @@ class AttentionDecoderBlock(nn.Module):
         self.conv = nn.Sequential(
             nn.Conv2d(out_channels * 2, out_channels, 3, padding=1, bias=False),
             nn.BatchNorm2d(out_channels),
-            nn.ReLU(inplace=True),
-            #nn.PReLU(),
+            #nn.ReLU(inplace=True),
+            nn.PReLU(),
             nn.Conv2d(out_channels, out_channels, 3, padding=1, bias=False),
             nn.BatchNorm2d(out_channels),
-            nn.ReLU(inplace=True),
-            #nn.PReLU(),
+            #nn.ReLU(inplace=True),
+            nn.PReLU(),
         )
 
     def forward(self, x: torch.Tensor, skip: torch.Tensor) -> torch.Tensor:
@@ -371,7 +371,7 @@ class Mamba_CBAMDecoderBlock(nn.Module):
         x = self.conv_block(x) # Procesamiento principal
         return self.cbam(x)    # Refinamiento con CBAM
 
-class CamouflageDetectionNet(nn.Module):
+class CamouflageDetectionNet2(nn.Module):
     def __init__(self, features=[64, 128, 256, 512], pretrained=True, dropout_prob=0.1):
         super().__init__()
         
@@ -450,7 +450,7 @@ class CamouflageDetectionNet(nn.Module):
 
 
 # Modelo Completo con Deep Supervision y estructura U-Net
-class CamouflageDetectionNet2(nn.Module):
+class CamouflageDetectionNet(nn.Module):
     def __init__(self, features=[64, 128, 256, 512], pretrained=True):
         super().__init__()
         
@@ -475,6 +475,15 @@ class CamouflageDetectionNet2(nn.Module):
         self.seg_head3 = nn.Conv2d(features[2], 1, kernel_size=1) # Output from decoder3
         self.seg_head2 = nn.Conv2d(features[1], 1, kernel_size=1) # Output from decoder2
         self.seg_head1 = nn.Conv2d(features[0], 1, kernel_size=1) # Output from decoder1
+
+        # Fusión jerárquica aprendida
+        self.fusion_mlp = nn.Sequential(
+            nn.Conv2d(in_channels=3, out_channels=8, kernel_size=3, padding=1, bias=False),
+            nn.BatchNorm2d(8),
+            #nn.ReLU(inplace=True),
+            nn.PReLU(),
+            nn.Conv2d(in_channels=8, out_channels=1, kernel_size=1)
+        )
        
     def forward(self, x: torch.Tensor):
         # --- Encoder ---
@@ -498,7 +507,10 @@ class CamouflageDetectionNet2(nn.Module):
         out1 = F.interpolate(self.seg_head1(dec1_out), size=x.shape[2:], mode='bilinear', align_corners=False)
         
         # Combinar las salidas (puedes elegir solo out1 o una combinación)
-        final_out = (out1 + out2 + out3) / 3 # Promedio 
+        #final_out = (out1 + out2 + out3) / 3 # Promedio 
+
+        fusion_input = torch.cat([out1, out2, out3], dim=1)  # [B, 3, H, W]
+        final_out = self.fusion_mlp(fusion_input)            # [B, 1, H, W]
 
         # Devolver todas las salidas y la final combinada
         return [out1, out2, out3], final_out
