@@ -353,7 +353,7 @@ class Mamba_CBAMEncoderBlock(nn.Module):
         self.cbam = CBAM(out_channels) # CBAM sobre la salida de Mamba
 
     def forward(self, x):
-        #x = self.mamba_block(x)
+        x = self.mamba_block(x)
         return self.cbam(x) # Aplicar CBAM después
 
 # Ejemplo de Bloque Decoder Alternativo (Conv -> CBAM)
@@ -368,7 +368,7 @@ class Mamba_CBAMDecoderBlock(nn.Module):
     def forward(self, x, skip):
         x = self.up(x)
         x = torch.cat([x, skip], dim=1)
-        #x = self.conv_block(x) # Procesamiento principal
+        x = self.conv_block(x) # Procesamiento principal
         return self.cbam(x)    # Refinamiento con CBAM
 
 class CamouflageDetectionNet(nn.Module):
@@ -380,14 +380,14 @@ class CamouflageDetectionNet(nn.Module):
 
         out_channels = self.backbone.out_channels  # [64, 128, 320, 512]
 
-        self.encoder1 = Mamba_CBAMEncoderBlock(out_channels[0], features[0])
-        self.encoder2 = Mamba_CBAMEncoderBlock(out_channels[1], features[1])
-        self.encoder3 = Mamba_CBAMEncoderBlock(out_channels[2], features[2])
-        self.encoder4 = Mamba_CBAMEncoderBlock(out_channels[3], features[3])
+        self.encoder1 = CBAM_MambaEncoderBlock(out_channels[0], features[0])
+        self.encoder2 = CBAM_MambaEncoderBlock(out_channels[1], features[1])
+        self.encoder3 = CBAM_MambaEncoderBlock(out_channels[2], features[2])
+        self.encoder4 = CBAM_MambaEncoderBlock(out_channels[3], features[3])
 
-        self.decoder3 = Mamba_CBAMDecoderBlock(features[3], features[2])
-        self.decoder2 = Mamba_CBAMDecoderBlock(features[2], features[1])
-        self.decoder1 = Mamba_CBAMDecoderBlock(features[1], features[0])
+        self.decoder3 = CBAM_MambaDecoderBlock(features[3], features[2])
+        self.decoder2 = CBAM_MambaDecoderBlock(features[2], features[1])
+        self.decoder1 = CBAM_MambaDecoderBlock(features[1], features[0])
 
         # --- Capa de Dropout ---
         # Usar nn.Dropout2d para mapas de características
