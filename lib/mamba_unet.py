@@ -331,12 +331,12 @@ class AttentionDecoderBlock(nn.Module):
         self.conv = nn.Sequential(
             nn.Conv2d(out_channels * 2, out_channels, 3, padding=1, bias=False),
             nn.BatchNorm2d(out_channels),
-            #nn.ReLU(inplace=True),
-            nn.PReLU(),
+            nn.ReLU(inplace=True),
+            #nn.PReLU(),
             nn.Conv2d(out_channels, out_channels, 3, padding=1, bias=False),
             nn.BatchNorm2d(out_channels),
-            #nn.ReLU(inplace=True),
-            nn.PReLU(),
+            nn.ReLU(inplace=True),
+            #nn.PReLU(),
         )
 
     def forward(self, x: torch.Tensor, skip: torch.Tensor) -> torch.Tensor:
