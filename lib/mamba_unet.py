@@ -168,9 +168,12 @@ class CBAM(nn.Module):
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # Channel Attention
         avg_out = self.channel_attention(x)
         max_out = self.channel_attention(F.adaptive_max_pool2d(x, 1))
         x = x * (avg_out + max_out)
+        
+        # Spatial Attention
         avg_out = torch.mean(x, dim=1, keepdim=True)
         max_out, _ = torch.max(x, dim=1, keepdim=True)
         spatial_attn = self.spatial_attention(torch.cat([avg_out, max_out], dim=1))
