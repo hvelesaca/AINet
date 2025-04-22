@@ -349,7 +349,7 @@ class AttentionDecoderBlock(nn.Module):
 class Mamba_CBAMEncoderBlock(nn.Module):
     def __init__(self, in_channels, out_channels, mamba_dim=64):
         super().__init__()
-        #self.mamba_block = MambaConvBlock(in_channels, out_channels, mamba_dim=mamba_dim)
+        self.mamba_block = MambaConvBlock(in_channels, out_channels, mamba_dim=mamba_dim)
         self.cbam = CBAM(out_channels) # CBAM sobre la salida de Mamba
 
     def forward(self, x):
@@ -362,7 +362,7 @@ class Mamba_CBAMDecoderBlock(nn.Module):
         super().__init__()
         self.up = nn.ConvTranspose2d(in_channels, out_channels, kernel_size=2, stride=2)
         # Combinar skip y upsample ANTES de la convolución principal
-        #self.conv_block = MambaConvBlock(out_channels * 2, out_channels) # O un bloque convolucional estándar
+        self.conv_block = MambaConvBlock(out_channels * 2, out_channels) # O un bloque convolucional estándar
         self.cbam = CBAM(out_channels) # CBAM sobre la salida del bloque principal
 
     def forward(self, x, skip):
@@ -380,14 +380,14 @@ class CamouflageDetectionNet(nn.Module):
 
         out_channels = self.backbone.out_channels  # [64, 128, 320, 512]
 
-        self.encoder1 = CBAM_MambaEncoderBlock(out_channels[0], features[0])
-        self.encoder2 = CBAM_MambaEncoderBlock(out_channels[1], features[1])
-        self.encoder3 = CBAM_MambaEncoderBlock(out_channels[2], features[2])
-        self.encoder4 = CBAM_MambaEncoderBlock(out_channels[3], features[3])
+        self.encoder1 = Mamba_CBAMEncoderBlock(out_channels[0], features[0])
+        self.encoder2 = Mamba_CBAMEncoderBlock(out_channels[1], features[1])
+        self.encoder3 = Mamba_CBAMEncoderBlock(out_channels[2], features[2])
+        self.encoder4 = Mamba_CBAMEncoderBlock(out_channels[3], features[3])
 
-        self.decoder3 = CBAM_MambaDecoderBlock(features[3], features[2])
-        self.decoder2 = CBAM_MambaDecoderBlock(features[2], features[1])
-        self.decoder1 = CBAM_MambaDecoderBlock(features[1], features[0])
+        self.decoder3 = Mamba_CBAMDecoderBlock(features[3], features[2])
+        self.decoder2 = Mamba_CBAMDecoderBlock(features[2], features[1])
+        self.decoder1 = Mamba_CBAMDecoderBlock(features[1], features[0])
 
         # --- Capa de Dropout ---
         # Usar nn.Dropout2d para mapas de características
