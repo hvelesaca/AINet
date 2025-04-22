@@ -5,28 +5,6 @@ from mamba_ssm import Mamba
 from huggingface_hub import hf_hub_download
 import timm
 
-#convnextv2_base, convnextv2_small, convnextv2_tiny
-# ConvNeXt Tiny devuelve 4 features: [96, 192, 384, 768]
-# ConvNeXt Small devuelve 4 features: [96, 192, 384, 768]
-# ConvNeXt Base devuelve 4 features: [128, 256, 512, 1024]
-class ConvNeXtBackbone(nn.Module):
-    def __init__(self, model_name="convnext_base", pretrained=True):
-        super().__init__()
-        try:
-          self.backbone = timm.create_model(model_name, features_only=True, pretrained=pretrained)
-          print(f"Modelo {model_name} cargado exitosamente.")
-
-          self.out_channels = [f['num_chs'] for f in self.backbone.feature_info]
-          print(f"Canales de salida de {model_name}: {self.out_channels}")
-
-        except Exception as e:
-          print(f"Error al cargar {model_name}: {e}")
-          print("Asegúrate de tener 'timm' instalado y que el nombre del modelo sea correcto.")
-
-    def forward_features(self, x):
-        return self.backbone(x)
-        
-        
 #pvt_v2_variants = [#'pvt_v2_b0',#'pvt_v2_b1',#'pvt_v2_b2', # La que usaste#'pvt_v2_b3',#'pvt_v2_b4',#'pvt_v2_b5',#]
 class PVTBackbone(nn.Module):
     def __init__(self, model_name="pvt_v2_b2", pretrained=True):
@@ -140,56 +118,7 @@ class CBAM(nn.Module):
         if not self.no_spatial:
             x_out = self.SpatialGate(x_out)
         return x_out
-
-
-#https://github.com/Peachypie98/CBAM
-class CBAM2(nn.Module):
-    def __init__(self, channels, reduction: int = 16):
-        super(CBAM, self).__init__()
-        self.channels = channels
-        self.r = reduction
-        self.sam = SAM(bias=False)
-        self.cam = CAM(channels=self.channels, r=self.r)
-
-    def forward(self, x):
-        output = self.cam(x)
-        output = self.sam(output)
-        return output + x
-
-class CAM(nn.Module):
-    def __init__(self, channels, r):
-        super(CAM, self).__init__()
-        self.channels = channels
-        self.r = r
-        self.linear = nn.Sequential(
-            nn.Linear(in_features=self.channels, out_features=self.channels//self.r, bias=True),
-            nn.ReLU(inplace=True),
-            nn.Linear(in_features=self.channels//self.r, out_features=self.channels, bias=True))
-
-    def forward(self, x):
-        max = F.adaptive_max_pool2d(x, output_size=1)
-        avg = F.adaptive_avg_pool2d(x, output_size=1)
-        b, c, _, _ = x.size()
-        linear_max = self.linear(max.view(b,c)).view(b, c, 1, 1)
-        linear_avg = self.linear(avg.view(b,c)).view(b, c, 1, 1)
-        output = linear_max + linear_avg
-        output = F.sigmoid(output) * x
-        return output
-
-class SAM(nn.Module):
-    def __init__(self, bias=False):
-        super(SAM, self).__init__()
-        self.bias = bias
-        self.conv = nn.Conv2d(in_channels=2, out_channels=1, kernel_size=7, stride=1, padding=3, dilation=1, bias=self.bias)
-
-    def forward(self, x):
-        max = torch.max(x,1)[0].unsqueeze(1)
-        avg = torch.mean(x,1).unsqueeze(1)
-        concat = torch.cat((max,avg), dim=1)
-        output = self.conv(concat)
-        output = F.sigmoid(output) * x 
-        return output 
-        
+       
 # CBAM Attention Module
 class CBAMOrin(nn.Module):
     def __init__(self, channels: int, reduction: int = 16):
@@ -244,33 +173,6 @@ class MambaConvBlock(nn.Module):
         x_mamba = self.mamba(x_pooled).transpose(1, 2).view(B, C, 16, 16)
         x_mamba = F.interpolate(x_mamba, size=(H, W), mode='bilinear', align_corners=False)
         return F.relu(x_mamba + identity)
-
-class CBAM3(nn.Module):
-    def __init__(self, channels: int, reduction: int = 16):
-        super().__init__()
-        self.channel_attention = nn.Sequential(
-            nn.AdaptiveAvgPool2d(1),
-            nn.Conv2d(channels, channels // reduction, 1, bias=False),
-            nn.PReLU(),
-            nn.Conv2d(channels // reduction, channels, 1, bias=False),
-            nn.Sigmoid()
-        )
-        self.spatial_attention = nn.Sequential(
-            nn.Conv2d(2, 1, kernel_size=7, padding=3, bias=False),
-            nn.Sigmoid()
-        )
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        # Channel Attention
-        avg_out = self.channel_attention(x)
-        max_out = self.channel_attention(F.adaptive_max_pool2d(x, 1))
-        x = x * (avg_out + max_out)
-        
-        # Spatial Attention
-        avg_out = torch.mean(x, dim=1, keepdim=True)
-        max_out, _ = torch.max(x, dim=1, keepdim=True)
-        spatial_attn = self.spatial_attention(torch.cat([avg_out, max_out], dim=1))
-        return x * spatial_attn
 
 class MambaConvBlockPRELU(nn.Module):
     def __init__(self, in_channels: int, out_channels: int, stride: int = 1, mamba_dim: int = 64):
@@ -476,15 +378,6 @@ class CamouflageDetectionNet(nn.Module):
         self.seg_head2 = nn.Conv2d(features[1], 1, kernel_size=1) # Output from decoder2
         self.seg_head1 = nn.Conv2d(features[0], 1, kernel_size=1) # Output from decoder1
 
-        # Fusión jerárquica aprendida
-        #self.fusion_mlp = nn.Sequential(
-        #    nn.Conv2d(in_channels=3, out_channels=8, kernel_size=3, padding=1, bias=False),
-        #    nn.BatchNorm2d(8),
-        #    #nn.ReLU(inplace=True),
-        #    nn.PReLU(),
-        #    nn.Conv2d(in_channels=8, out_channels=1, kernel_size=1)
-        #)
-       
     def forward(self, x: torch.Tensor):
         # --- Encoder ---
         skips = self.backbone.forward_features(x) # Obtener features del backbone [s1, s2, s3, s4]
@@ -508,9 +401,6 @@ class CamouflageDetectionNet(nn.Module):
         
         # Combinar las salidas (puedes elegir solo out1 o una combinación)
         final_out = (out1 + out2 + out3) / 3 # Promedio 
-
-        #fusion_input = torch.cat([out1, out2, out3], dim=1)  # [B, 3, H, W]
-        #final_out = self.fusion_mlp(fusion_input)            # [B, 1, H, W]
 
         # Devolver todas las salidas y la final combinada
         return [out1, out2, out3], final_out
