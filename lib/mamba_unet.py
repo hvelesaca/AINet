@@ -106,7 +106,7 @@ class SpatialGate(nn.Module):
         scale = F.sigmoid(x_out) # broadcasting
         return x * scale
 
-class CBAM(nn.Module):
+class CBAM2(nn.Module):
     def __init__(self, gate_channels, reduction_ratio=16, pool_types=['avg', 'max'], no_spatial=False):
         super(CBAM, self).__init__()
         self.ChannelGate = ChannelGate(gate_channels, reduction_ratio, pool_types)
@@ -120,7 +120,7 @@ class CBAM(nn.Module):
         return x_out
        
 # CBAM Attention Module
-class CBAMOrin(nn.Module):
+class CBAM(nn.Module):
     def __init__(self, channels: int, reduction: int = 16):
         super().__init__()
         self.channel_attention = nn.Sequential(
@@ -210,12 +210,12 @@ class AttentionDecoderBlock(nn.Module):
         self.conv = nn.Sequential(
             nn.Conv2d(out_channels * 2, out_channels, 3, padding=1, bias=False),
             nn.BatchNorm2d(out_channels),
-            #nn.ReLU(inplace=True),
-            nn.PReLU(),
+            nn.ReLU(inplace=True),
+            #nn.PReLU(),
             nn.Conv2d(out_channels, out_channels, 3, padding=1, bias=False),
             nn.BatchNorm2d(out_channels),
-            #nn.ReLU(inplace=True),
-            nn.PReLU(),
+            nn.ReLU(inplace=True),
+            #nn.PReLU(),
         )
 
     def forward(self, x: torch.Tensor, skip: torch.Tensor) -> torch.Tensor:
