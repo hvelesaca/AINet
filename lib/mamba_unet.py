@@ -98,7 +98,7 @@ class SAM(nn.Module):
         return output 
         
 # CBAM Attention Module
-class CBAMAnt(nn.Module):
+class CBAM(nn.Module):
     def __init__(self, channels: int, reduction: int = 16):
         super().__init__()
         self.channel_attention = nn.Sequential(
@@ -152,7 +152,7 @@ class MambaConvBlockAnt(nn.Module):
         x_mamba = F.interpolate(x_mamba, size=(H, W), mode='bilinear', align_corners=False)
         return F.relu(x_mamba + identity)
 
-class CBAM(nn.Module):
+class CBAM3(nn.Module):
     def __init__(self, channels: int, reduction: int = 16):
         super().__init__()
         self.channel_attention = nn.Sequential(
