@@ -98,7 +98,7 @@ class SAM(nn.Module):
         return output 
         
 # CBAM Attention Module
-class CBAM(nn.Module):
+class CBAMAnt(nn.Module):
     def __init__(self, channels: int, reduction: int = 16):
         super().__init__()
         self.channel_attention = nn.Sequential(
@@ -126,7 +126,7 @@ class CBAM(nn.Module):
         return x * spatial_attn
 
 # Mamba Convolutional Block
-class MambaConvBlock(nn.Module):
+class MambaConvBlockAnt(nn.Module):
     def __init__(self, in_channels: int, out_channels: int, stride: int = 1, mamba_dim: int = 64):
         super().__init__()
         self.conv = nn.Sequential(
@@ -152,6 +152,57 @@ class MambaConvBlock(nn.Module):
         x_mamba = F.interpolate(x_mamba, size=(H, W), mode='bilinear', align_corners=False)
         return F.relu(x_mamba + identity)
 
+class CBAM(nn.Module):
+    def __init__(self, channels: int, reduction: int = 16):
+        super().__init__()
+        self.channel_attention = nn.Sequential(
+            nn.AdaptiveAvgPool2d(1),
+            nn.Conv2d(channels, channels // reduction, 1, bias=False),
+            nn.PReLU(),
+            nn.Conv2d(channels // reduction, channels, 1, bias=False),
+            nn.Sigmoid()
+        )
+        self.spatial_attention = nn.Sequential(
+            nn.Conv2d(2, 1, kernel_size=7, padding=3, bias=False),
+            nn.Sigmoid()
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        avg_out = self.channel_attention(x)
+        max_out = self.channel_attention(F.adaptive_max_pool2d(x, 1))
+        x = x * (avg_out + max_out)
+        avg_out = torch.mean(x, dim=1, keepdim=True)
+        max_out, _ = torch.max(x, dim=1, keepdim=True)
+        spatial_attn = self.spatial_attention(torch.cat([avg_out, max_out], dim=1))
+        return x * spatial_attn
+
+class MambaConvBlock(nn.Module):
+    def __init__(self, in_channels: int, out_channels: int, stride: int = 1, mamba_dim: int = 64):
+        super().__init__()
+        self.prelu = nn.PReLU()
+        self.conv = nn.Sequential(
+            nn.Conv2d(in_channels, out_channels, 3, stride, 1, bias=False),
+            nn.BatchNorm2d(out_channels),
+            nn.PReLU(),
+        )
+        self.pool = nn.AdaptiveAvgPool2d((16, 16))
+        self.mamba = Mamba(d_model=out_channels, d_state=mamba_dim, d_conv=4, expand=2)
+        self.residual = nn.Identity()
+        if stride != 1 or in_channels != out_channels:
+            self.residual = nn.Sequential(
+                nn.Conv2d(in_channels, out_channels, 1, stride, bias=False),
+                nn.BatchNorm2d(out_channels)
+            )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        identity = self.residual(x)
+        x = self.conv(x)
+        B, C, H, W = x.shape
+        x_pooled = self.pool(x).flatten(2).transpose(1, 2)
+        x_mamba = self.mamba(x_pooled).transpose(1, 2).view(B, C, 16, 16)
+        x_mamba = F.interpolate(x_mamba, size=(H, W), mode='bilinear', align_corners=False)
+        return F.prelu(x_mamba + identity, self.prelu.weight)
+        
 class CBAM_MambaEncoderBlock(nn.Module):
     def __init__(self, in_channels, out_channels, mamba_dim=64):
         super().__init__()
@@ -184,10 +235,12 @@ class AttentionDecoderBlock(nn.Module):
         self.conv = nn.Sequential(
             nn.Conv2d(out_channels * 2, out_channels, 3, padding=1, bias=False),
             nn.BatchNorm2d(out_channels),
-            nn.ReLU(inplace=True),
+            #nn.ReLU(inplace=True),
+            nn.PReLU(),
             nn.Conv2d(out_channels, out_channels, 3, padding=1, bias=False),
             nn.BatchNorm2d(out_channels),
-            nn.ReLU(inplace=True),
+            #nn.ReLU(inplace=True),
+            nn.PReLU(),
         )
 
     def forward(self, x: torch.Tensor, skip: torch.Tensor) -> torch.Tensor:
