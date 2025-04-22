@@ -306,8 +306,8 @@ class CBAM_MambaEncoderBlock(nn.Module):
         self.mamba_block = MambaConvBlock(in_channels, out_channels, mamba_dim=mamba_dim)
 
     def forward(self, x):
-        x = self.cbam(x)
-        return self.mamba_block(x)
+        return self.cbam(x)
+        #return self.mamba_block(x)
 
 class CBAM_MambaDecoderBlock(nn.Module):
     def __init__(self, in_channels, out_channels):
@@ -319,8 +319,8 @@ class CBAM_MambaDecoderBlock(nn.Module):
     def forward(self, x, skip):
         x = self.up(x)
         x = torch.cat([x, skip], dim=1)
-        x = self.cbam(x)
-        return self.mamba_block(x)
+        return self.cbam(x)
+        #return self.mamba_block(x)
 
 # Attention Decoder Block with CBAM
 class AttentionDecoderBlock(nn.Module):
@@ -371,7 +371,7 @@ class Mamba_CBAMDecoderBlock(nn.Module):
         x = self.conv_block(x) # Procesamiento principal
         return self.cbam(x)    # Refinamiento con CBAM
 
-class CamouflageDetectionNet2(nn.Module):
+class CamouflageDetectionNet(nn.Module):
     def __init__(self, features=[64, 128, 320, 512], pretrained=True, dropout_prob=0.1):
         super().__init__()
         
@@ -449,7 +449,7 @@ class CamouflageDetectionNet2(nn.Module):
 
 
 # Modelo Completo con Deep Supervision y estructura U-Net
-class CamouflageDetectionNet(nn.Module):
+class CamouflageDetectionNet2(nn.Module):
     def __init__(self, features=[64, 128, 256, 512], pretrained=True):
         super().__init__()
         
