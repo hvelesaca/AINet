@@ -111,7 +111,7 @@ class CamouflageDetectionNet(nn.Module):
         out_channels = self.backbone.out_channels  # [96, 192, 384, 768]
 
         self.encoders = nn.ModuleList([
-            MambaConvBlock(pvt_channels[i], features[i]) for i in range(4)
+            MambaConvBlock(out_channels[i], features[i]) for i in range(4)
         ])
 
         self.decoders = nn.ModuleList([
