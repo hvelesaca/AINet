@@ -16,7 +16,6 @@ class PVTBackbone(nn.Module):
           print(f"Modelo {model_name} cargado exitosamente.")
 
           # Obtener los canales de salida (importante para conectar a los encoders)
-          #self.out_channels = [f['num_chs'] for f in self.backbone.feature_info]
           self.out_channels = [64, 128, 320, 512]
           print(f"Canales de salida de {model_name}: {self.out_channels}")
 
@@ -27,98 +26,6 @@ class PVTBackbone(nn.Module):
     def forward_features(self, x):
         return self.backbone(x)
 
-#https://github.com/Jongchan/attention-module/blob/c06383c514ab0032d044cc6fcd8c8207ea222ea7/MODELS/cbam.py
-class BasicConv(nn.Module):
-    def __init__(self, in_planes, out_planes, kernel_size, stride=1, padding=0, dilation=1, groups=1, relu=True, bn=True, bias=False):
-        super(BasicConv, self).__init__()
-        self.out_channels = out_planes
-        self.conv = nn.Conv2d(in_planes, out_planes, kernel_size=kernel_size, stride=stride, padding=padding, dilation=dilation, groups=groups, bias=bias)
-        self.bn = nn.BatchNorm2d(out_planes,eps=1e-5, momentum=0.01, affine=True) if bn else None
-        self.relu = nn.ReLU() if relu else None
-
-    def forward(self, x):
-        x = self.conv(x)
-        if self.bn is not None:
-            x = self.bn(x)
-        if self.relu is not None:
-            x = self.relu(x)
-        return x
-
-class Flatten(nn.Module):
-    def forward(self, x):
-        return x.view(x.size(0), -1)
-
-class ChannelGate(nn.Module):
-    def __init__(self, gate_channels, reduction_ratio=16, pool_types=['avg', 'max']):
-        super(ChannelGate, self).__init__()
-        self.gate_channels = gate_channels
-        self.mlp = nn.Sequential(
-            Flatten(),
-            nn.Linear(gate_channels, gate_channels // reduction_ratio),
-            nn.ReLU(),
-            nn.Linear(gate_channels // reduction_ratio, gate_channels)
-            )
-        self.pool_types = pool_types
-    def forward(self, x):
-        channel_att_sum = None
-        for pool_type in self.pool_types:
-            if pool_type=='avg':
-                avg_pool = F.avg_pool2d( x, (x.size(2), x.size(3)), stride=(x.size(2), x.size(3)))
-                channel_att_raw = self.mlp( avg_pool )
-            elif pool_type=='max':
-                max_pool = F.max_pool2d( x, (x.size(2), x.size(3)), stride=(x.size(2), x.size(3)))
-                channel_att_raw = self.mlp( max_pool )
-            elif pool_type=='lp':
-                lp_pool = F.lp_pool2d( x, 2, (x.size(2), x.size(3)), stride=(x.size(2), x.size(3)))
-                channel_att_raw = self.mlp( lp_pool )
-            elif pool_type=='lse':
-                # LSE pool only
-                lse_pool = logsumexp_2d(x)
-                channel_att_raw = self.mlp( lse_pool )
-
-            if channel_att_sum is None:
-                channel_att_sum = channel_att_raw
-            else:
-                channel_att_sum = channel_att_sum + channel_att_raw
-
-        scale = F.sigmoid( channel_att_sum ).unsqueeze(2).unsqueeze(3).expand_as(x)
-        return x * scale
-
-def logsumexp_2d(tensor):
-    tensor_flatten = tensor.view(tensor.size(0), tensor.size(1), -1)
-    s, _ = torch.max(tensor_flatten, dim=2, keepdim=True)
-    outputs = s + (tensor_flatten - s).exp().sum(dim=2, keepdim=True).log()
-    return outputs
-
-class ChannelPool(nn.Module):
-    def forward(self, x):
-        return torch.cat( (torch.max(x,1)[0].unsqueeze(1), torch.mean(x,1).unsqueeze(1)), dim=1 )
-
-class SpatialGate(nn.Module):
-    def __init__(self):
-        super(SpatialGate, self).__init__()
-        kernel_size = 7
-        self.compress = ChannelPool()
-        self.spatial = BasicConv(2, 1, kernel_size, stride=1, padding=(kernel_size-1) // 2, relu=False)
-    def forward(self, x):
-        x_compress = self.compress(x)
-        x_out = self.spatial(x_compress)
-        scale = F.sigmoid(x_out) # broadcasting
-        return x * scale
-
-class CBAM2(nn.Module):
-    def __init__(self, gate_channels, reduction_ratio=16, pool_types=['avg', 'max'], no_spatial=False):
-        super(CBAM, self).__init__()
-        self.ChannelGate = ChannelGate(gate_channels, reduction_ratio, pool_types)
-        self.no_spatial=no_spatial
-        if not no_spatial:
-            self.SpatialGate = SpatialGate()
-    def forward(self, x):
-        x_out = self.ChannelGate(x)
-        if not self.no_spatial:
-            x_out = self.SpatialGate(x_out)
-        return x_out
-       
 # CBAM Attention Module
 class CBAM(nn.Module):
     def __init__(self, channels: int, reduction: int = 16):
@@ -154,7 +61,7 @@ class MambaConvBlock(nn.Module):
         self.conv = nn.Sequential(
             nn.Conv2d(in_channels, out_channels, 3, stride, 1, bias=False),
             nn.BatchNorm2d(out_channels),
-            nn.ReLU(inplace=True),
+            nn.ReLU(inplace=True)
         )
         self.pool = nn.AdaptiveAvgPool2d((16, 16))
         self.mamba = Mamba(d_model=out_channels, d_state=mamba_dim, d_conv=4, expand=2)
@@ -174,33 +81,6 @@ class MambaConvBlock(nn.Module):
         x_mamba = F.interpolate(x_mamba, size=(H, W), mode='bilinear', align_corners=False)
         return F.relu(x_mamba + identity)
 
-class MambaConvBlockPRELU(nn.Module):
-    def __init__(self, in_channels: int, out_channels: int, stride: int = 1, mamba_dim: int = 64):
-        super().__init__()
-        self.prelu = nn.PReLU()
-        self.conv = nn.Sequential(
-            nn.Conv2d(in_channels, out_channels, 3, stride, 1, bias=False),
-            nn.BatchNorm2d(out_channels),
-            nn.PReLU(),
-        )
-        self.pool = nn.AdaptiveAvgPool2d((16, 16))
-        self.mamba = Mamba(d_model=out_channels, d_state=mamba_dim, d_conv=4, expand=2)
-        self.residual = nn.Identity()
-        if stride != 1 or in_channels != out_channels:
-            self.residual = nn.Sequential(
-                nn.Conv2d(in_channels, out_channels, 1, stride, bias=False),
-                nn.BatchNorm2d(out_channels)
-            )
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        identity = self.residual(x)
-        x = self.conv(x)
-        B, C, H, W = x.shape
-        x_pooled = self.pool(x).flatten(2).transpose(1, 2)
-        x_mamba = self.mamba(x_pooled).transpose(1, 2).view(B, C, 16, 16)
-        x_mamba = F.interpolate(x_mamba, size=(H, W), mode='bilinear', align_corners=False)
-        return F.prelu(x_mamba + identity, self.prelu.weight)
-
 # Attention Decoder Block with CBAM
 class AttentionDecoderBlock(nn.Module):
     def __init__(self, in_channels: int, out_channels: int):
@@ -211,11 +91,9 @@ class AttentionDecoderBlock(nn.Module):
             nn.Conv2d(out_channels * 2, out_channels, 3, padding=1, bias=False),
             nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True),
-            #nn.PReLU(),
             nn.Conv2d(out_channels, out_channels, 3, padding=1, bias=False),
             nn.BatchNorm2d(out_channels),
-            nn.ReLU(inplace=True),
-            #nn.PReLU(),
+            nn.ReLU(inplace=True)
         )
 
     def forward(self, x: torch.Tensor, skip: torch.Tensor) -> torch.Tensor:
@@ -232,59 +110,34 @@ class CamouflageDetectionNet(nn.Module):
         self.backbone = PVTBackbone("pvt_v2_b2", pretrained=True)
         out_channels = self.backbone.out_channels  # [96, 192, 384, 768]
 
-        # --- Encoder Path ---
-        # Módulos Mamba que procesan las salidas del backbone
-        self.encoder1 = MambaConvBlock(out_channels[0], features[0])
-        self.encoder2 = MambaConvBlock(out_channels[1], features[1])
-        self.encoder3 = MambaConvBlock(out_channels[2], features[2])
-        self.encoder4 = MambaConvBlock(out_channels[3], features[3])
+        self.encoders = nn.ModuleList([
+            MambaConvBlock(pvt_channels[i], features[i]) for i in range(4)
+        ])
 
-        # --- Decoder Path ---
-        # Módulos Decoder que reciben la salida del nivel anterior y el skip connection
-        self.decoder3 = AttentionDecoderBlock(features[3], features[2]) # Up(enc4) + enc3
-        self.decoder2 = AttentionDecoderBlock(features[2], features[1]) # Up(dec3) + enc2
-        self.decoder1 = AttentionDecoderBlock(features[1], features[0]) # Up(dec2) + enc1
+        self.decoders = nn.ModuleList([
+            AttentionDecoderBlock(features[3], features[2]),
+            AttentionDecoderBlock(features[2], features[1]),
+            AttentionDecoderBlock(features[1], features[0])
+        ])
 
-        # --- Segmentation Heads (Deep Supervision) ---
-        #self.dropout = nn.Dropout2d(p=dropout_prob) # Capa de Dropout
-        self.seg_head3 = nn.Conv2d(features[2], 1, kernel_size=1) # Output from decoder3
-        self.seg_head2 = nn.Conv2d(features[1], 1, kernel_size=1) # Output from decoder2
-        self.seg_head1 = nn.Conv2d(features[0], 1, kernel_size=1) # Output from decoder1
-
+        self.seg_heads = nn.ModuleList([
+            nn.Conv2d(features[i], 1, kernel_size=1) for i in range(3)
+        ])
+        
     def forward(self, x: torch.Tensor):
-        # --- Encoder ---
-        skips = self.backbone.forward_features(x) # Obtener features del backbone [s1, s2, s3, s4]
-        # Procesar skips con MambaConvBlocks
-        enc1_out = self.encoder1(skips[0])
-        enc2_out = self.encoder2(skips[1])
-        enc3_out = self.encoder3(skips[2])
-        enc4_out = self.encoder4(skips[3]) # Bottleneck feature
+        skips = self.backbone.forward_features(x)
+        enc_feats = [enc(skip) for enc, skip in zip(self.encoders, skips)]
 
-        # --- Decoder ---
-        # Pasar la salida del encoder anterior y el skip correspondiente
-        dec3_out = self.decoder3(enc4_out, enc3_out) # Input: Bottleneck, Skip: Encoder 3 output
-        dec2_out = self.decoder2(dec3_out, enc2_out) # Input: Decoder 3 out, Skip: Encoder 2 output
-        dec1_out = self.decoder1(dec2_out, enc1_out) # Input: Decoder 2 out, Skip: Encoder 1 output
-        
-        # Generar salidas de segmentación en diferentes niveles del decoder
-        # Interpolar todas a la dimensión de la entrada original
-        out3 = F.interpolate(self.seg_head3(dec3_out), size=x.shape[2:], mode='bilinear', align_corners=False)
-        out2 = F.interpolate(self.seg_head2(dec2_out), size=x.shape[2:], mode='bilinear', align_corners=False)
-        out1 = F.interpolate(self.seg_head1(dec1_out), size=x.shape[2:], mode='bilinear', align_corners=False)
-        
-        # Combinar las salidas (puedes elegir solo out1 o una combinación)
-        final_out = (out1 + out2 + out3) / 3 # Promedio 
+        d3 = self.decoders[0](enc_feats[3], enc_feats[2])
+        d2 = self.decoders[1](d3, enc_feats[1])
+        d1 = self.decoders[2](d2, enc_feats[0])
 
-        # Devolver todas las salidas y la final combinada
+        out1 = F.interpolate(self.seg_heads[0](d1), size=x.shape[2:], mode='bilinear', align_corners=False)
+        out2 = F.interpolate(self.seg_heads[1](d2), size=x.shape[2:], mode='bilinear', align_corners=False)
+        out3 = F.interpolate(self.seg_heads[2](d3), size=x.shape[2:], mode='bilinear', align_corners=False)
+
+        final_out = (out1 + out2 + out3) / 3
         return [out1, out2, out3], final_out
-    
-    def _load_backbone_weights(self, path: str):
-        try:
-            state_dict = torch.load(path, map_location='cpu')
-            self.backbone.load_state_dict(state_dict, strict=False)
-            print("✅ Pesos backbone cargados correctamente.")
-        except Exception as e:
-            print(f"❌ Error cargando pesos backbone: {e}")
         
 # Ejemplo de uso optimizado
 if __name__ == "__main__":
