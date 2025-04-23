@@ -4,6 +4,7 @@ import torch.nn.functional as F
 from mamba_ssm import Mamba
 from huggingface_hub import hf_hub_download
 import timm
+from lib.pvtv2 import pvt_v2_b2
 
 #pvt_v2_variants = [#'pvt_v2_b0',#'pvt_v2_b1',#'pvt_v2_b2', # La que usaste#'pvt_v2_b3',#'pvt_v2_b4',#'pvt_v2_b5',#]
 class PVTBackbone(nn.Module):
@@ -106,9 +107,10 @@ class AttentionDecoderBlock(nn.Module):
 class CamouflageDetectionNet(nn.Module):
     def __init__(self, features=[64, 128, 256, 512], pretrained=True):
         super().__init__()
-        
+        self.backbone = pvt_v2_b2()        
         self.backbone = PVTBackbone("pvt_v2_b2", pretrained=True)
-        out_channels = self.backbone.out_channels  # [96, 192, 384, 768]
+        
+        out_channels = [64, 128, 320, 512] #self.backbone.out_channels 
 
         self.encoders = nn.ModuleList([
             MambaConvBlock(out_channels[i], features[i]) for i in range(4)
