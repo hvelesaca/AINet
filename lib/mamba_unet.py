@@ -6,27 +6,6 @@ from huggingface_hub import hf_hub_download
 import timm
 from lib.pvtv2 import pvt_v2_b2
 
-#pvt_v2_variants = [#'pvt_v2_b0',#'pvt_v2_b1',#'pvt_v2_b2', # La que usaste#'pvt_v2_b3',#'pvt_v2_b4',#'pvt_v2_b5',#]
-class PVTBackbone(nn.Module):
-    def __init__(self, model_name="pvt_v2_b2", pretrained=True):
-        super().__init__()
-        
-        try:
-          # Crear el backbone usando timm
-          self.backbone = timm.create_model(model_name, features_only=True, pretrained=pretrained)# ¡Importante para obtener skips!
-          print(f"Modelo {model_name} cargado exitosamente.")
-
-          # Obtener los canales de salida (importante para conectar a los encoders)
-          self.out_channels = [64, 128, 320, 512]
-          print(f"Canales de salida de {model_name}: {self.out_channels}")
-
-        except Exception as e:
-          print(f"Error al cargar {model_name}: {e}")
-          print("Asegúrate de tener 'timm' instalado y que el nombre del modelo sea correcto.")
-
-    def forward_features(self, x):
-        return self.backbone(x)
-
 # CBAM Attention Module
 class CBAM(nn.Module):
     def __init__(self, channels: int, reduction: int = 16):
@@ -142,13 +121,13 @@ class CamouflageDetectionNet(nn.Module):
         final_out = (out1 + out2 + out3) / 3
         return [out1, out2, out3], final_out
 
-def _load_backbone_weights(self, path: str):
-    try:
-        state_dict = torch.load(path, map_location='cpu')
-        self.backbone.load_state_dict(state_dict, strict=False)
-        print("✅ Pesos backbone cargados correctamente.")
-    except Exception as e:
-        print(f"❌ Error cargando pesos backbone: {e}")
+    def _load_backbone_weights(self, path: str):
+        try:
+            state_dict = torch.load(path, map_location='cpu')
+            self.backbone.load_state_dict(state_dict, strict=False)
+            print("✅ Pesos backbone cargados correctamente.")
+        except Exception as e:
+            print(f"❌ Error cargando pesos backbone: {e}")
         
 # Ejemplo de uso optimizado
 if __name__ == "__main__":
