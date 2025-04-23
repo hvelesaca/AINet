@@ -107,9 +107,10 @@ class AttentionDecoderBlock(nn.Module):
 class CamouflageDetectionNet(nn.Module):
     def __init__(self, features=[64, 128, 256, 512], pretrained=True):
         super().__init__()
-        self.backbone = pvt_v2_b2()        
-        self.backbone = PVTBackbone("pvt_v2_b2", pretrained=True)
-        
+        self.backbone = pvt_v2_b2()  
+        if pretrained:
+            self._load_backbone_weights('/kaggle/input/pretrained_pvt_v2_b2/pytorch/default/1/pvt_v2_b2.pth')      
+                
         out_channels = [64, 128, 320, 512] #self.backbone.out_channels 
 
         self.encoders = nn.ModuleList([
@@ -140,6 +141,14 @@ class CamouflageDetectionNet(nn.Module):
 
         final_out = (out1 + out2 + out3) / 3
         return [out1, out2, out3], final_out
+
+def _load_backbone_weights(self, path: str):
+    try:
+        state_dict = torch.load(path, map_location='cpu')
+        self.backbone.load_state_dict(state_dict, strict=False)
+        print("✅ Pesos backbone cargados correctamente.")
+    except Exception as e:
+        print(f"❌ Error cargando pesos backbone: {e}")
         
 # Ejemplo de uso optimizado
 if __name__ == "__main__":
