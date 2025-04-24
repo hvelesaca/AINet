@@ -142,12 +142,7 @@ def val(model, epoch, save_path, writer):
             image = image.cuda()
 
             res, res1 = model(image)
-            combined_res = res[1]+ res[-1] + res1 
-            
-            # Opción A: Suma
-            #combined_res = res1 #Original             
-            # Opción B: Promedio (conceptualmete similar a la suma por la normalización posterior)
-            #combined_res = (res1 + res[1] + res[0] + res[-1]) / 3
+            combined_res = res[-1] + res1 
 
             # eval Dice
             res = F.interpolate(combined_res, size=gt.shape[-2:], mode='bilinear', align_corners=False) # Usar gt.shape[-2:] para obtener H, W
