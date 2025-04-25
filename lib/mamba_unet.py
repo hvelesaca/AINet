@@ -146,6 +146,32 @@ class AttentionDecoderBlock(nn.Module):
         x = self.cbam(x)
         return self.conv(x)
 
+# Ejemplo de Bloque Encoder Alternativo (Mamba -> CBAM)
+class Mamba_CBAMEncoderBlock(nn.Module):
+    def __init__(self, in_channels, out_channels, mamba_dim=64):
+        super().__init__()
+        self.mamba_block = MambaConvBlock(in_channels, out_channels, mamba_dim=mamba_dim)
+        self.cbam = CBAM(out_channels) # CBAM sobre la salida de Mamba
+
+    def forward(self, x):
+        x = self.mamba_block(x)
+        return self.cbam(x) # Aplicar CBAM después
+
+# Ejemplo de Bloque Decoder Alternativo (Conv -> CBAM)
+class Mamba_CBAMDecoderBlock(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super().__init__()
+        self.up = nn.ConvTranspose2d(in_channels, out_channels, kernel_size=2, stride=2)
+        # Combinar skip y upsample ANTES de la convolución principal
+        self.conv_block = MambaConvBlock(out_channels * 2, out_channels) # O un bloque convolucional estándar
+        self.cbam = CBAM(out_channels) # CBAM sobre la salida del bloque principal
+
+    def forward(self, x, skip):
+        x = self.up(x)
+        x = torch.cat([x, skip], dim=1)
+        x = self.conv_block(x) # Procesamiento principal
+        return self.cbam(x)    # Refinamiento con CBAM
+        
 # Modelo Completo con Deep Supervision y estructura U-Net
 class CamouflageDetectionNet(nn.Module):
     def __init__(self, features=[64, 128, 256, 512], pretrained=True):
@@ -156,46 +182,85 @@ class CamouflageDetectionNet(nn.Module):
                 
         out_channels = [64, 128, 320, 512] #self.backbone.out_channels 
 
-        self.encoders = nn.ModuleList([
-            MambaConvBlock(out_channels[i], features[i]) for i in range(4)
-        ])
+        # --- Encoder Path ---
+        self.encoder1 = Mamba_CBAMEncoderBlock(out_channels[0], features[0])
+        self.encoder2 = Mamba_CBAMEncoderBlock(out_channels[1], features[1])
+        self.encoder3 = Mamba_CBAMEncoderBlock(out_channels[2], features[2])
+        self.encoder4 = Mamba_CBAMEncoderBlock(out_channels[3], features[3])
 
-        self.decoders = nn.ModuleList([
-            AttentionDecoderBlock(features[3], features[2]),
-            AttentionDecoderBlock(features[2], features[1]),
-            AttentionDecoderBlock(features[1], features[0])
-        ])
+        # --- Decoder Path ---
+        self.decoder3 = Mamba_CBAMDecoderBlock(features[3], features[2])
+        self.decoder2 = Mamba_CBAMDecoderBlock(features[2], features[1])
+        self.decoder1 = Mamba_CBAMDecoderBlock(features[1], features[0])
 
-        self.seg_heads = nn.ModuleList([
-            nn.Conv2d(features[i], 1, kernel_size=1) for i in range(3)
-        ])
+        # --- Segmentation Heads (Deep Supervision) ---
+        #self.dropout = nn.Dropout2d(p=dropout_prob) # Capa de Dropout
+        self.seg_head3 = nn.Conv2d(features[2], 1, kernel_size=1) # Output from decoder3
+        self.seg_head2 = nn.Conv2d(features[1], 1, kernel_size=1) # Output from decoder2
+        self.seg_head1 = nn.Conv2d(features[0], 1, kernel_size=1) # Output from decoder1
+        
+        #self.encoders = nn.ModuleList([
+        #    MambaConvBlock(out_channels[i], features[i]) for i in range(4)
+        #])
+
+        #self.decoders = nn.ModuleList([
+        #    AttentionDecoderBlock(features[3], features[2]),
+        #    AttentionDecoderBlock(features[2], features[1]),
+        #    AttentionDecoderBlock(features[1], features[0])
+        #])
+
+        #self.seg_heads = nn.ModuleList([
+        #    nn.Conv2d(features[i], 1, kernel_size=1) for i in range(3)
+        #])
 
         # Fusión jerárquica aprendida
-        self.fusion_mlp = nn.Sequential(
-            nn.Conv2d(in_channels=3, out_channels=8, kernel_size=3, padding=1, bias=False),
-            nn.BatchNorm2d(8),
-            #nn.ReLU(inplace=True),
-            nn.PReLU(),
-            nn.Conv2d(in_channels=8, out_channels=1, kernel_size=1)
-        )
+        #self.fusion_mlp = nn.Sequential(
+        #    nn.Conv2d(in_channels=3, out_channels=8, kernel_size=3, padding=1, bias=False),
+        #    nn.BatchNorm2d(8),
+        #    #nn.ReLU(inplace=True),
+        #    nn.PReLU(),
+        #    nn.Conv2d(in_channels=8, out_channels=1, kernel_size=1)
+        #)
         
     def forward(self, x: torch.Tensor):
         skips = self.backbone.forward_features(x)
-        enc_feats = [enc(skip) for enc, skip in zip(self.encoders, skips)]
+        #enc_feats = [enc(skip) for enc, skip in zip(self.encoders, skips)]
 
-        d3 = self.decoders[0](enc_feats[3], enc_feats[2])
-        d2 = self.decoders[1](d3, enc_feats[1])
-        d1 = self.decoders[2](d2, enc_feats[0])
+        #d3 = self.decoders[0](enc_feats[3], enc_feats[2])
+        #d2 = self.decoders[1](d3, enc_feats[1])
+        #d1 = self.decoders[2](d2, enc_feats[0])
 
-        out1 = F.interpolate(self.seg_heads[0](d1), size=x.shape[2:], mode='bilinear', align_corners=False)
-        out2 = F.interpolate(self.seg_heads[1](d2), size=x.shape[2:], mode='bilinear', align_corners=False)
-        out3 = F.interpolate(self.seg_heads[2](d3), size=x.shape[2:], mode='bilinear', align_corners=False)
-
-        #final_out = (out1 + out2 + out3) / 3
-        # --- Fusión Jerárquica ---
-        fusion_input = torch.cat([out1, out2, out3], dim=1)  # [B, 3, H, W]
-        final_out = self.fusion_mlp(fusion_input)            # [B, 1, H, W]
+        #out1 = F.interpolate(self.seg_heads[0](d1), size=x.shape[2:], mode='bilinear', align_corners=False)
+        #out2 = F.interpolate(self.seg_heads[1](d2), size=x.shape[2:], mode='bilinear', align_corners=False)
+        #out3 = F.interpolate(self.seg_heads[2](d3), size=x.shape[2:], mode='bilinear', align_corners=False)
         
+        # --- Encoder ---
+        skips = self.backbone.forward_features(x) # Obtener features del backbone [s1, s2, s3, s4]
+        # Procesar skips con MambaConvBlocks
+        enc1_out = self.encoder1(skips[0])
+        enc2_out = self.encoder2(skips[1])
+        enc3_out = self.encoder3(skips[2])
+        enc4_out = self.encoder4(skips[3]) # Bottleneck feature
+
+        # --- Decoder ---
+        # Pasar la salida del encoder anterior y el skip correspondiente
+        dec3_out = self.decoder3(enc4_out, enc3_out) # Input: Bottleneck, Skip: Encoder 3 output
+        dec2_out = self.decoder2(dec3_out, enc2_out) # Input: Decoder 3 out, Skip: Encoder 2 output
+        dec1_out = self.decoder1(dec2_out, enc1_out) # Input: Decoder 2 out, Skip: Encoder 1 output
+        
+        # Generar salidas de segmentación en diferentes niveles del decoder
+        # Interpolar todas a la dimensión de la entrada original
+        out3 = F.interpolate(self.seg_head3(dec3_out), size=x.shape[2:], mode='bilinear', align_corners=False)
+        out2 = F.interpolate(self.seg_head2(dec2_out), size=x.shape[2:], mode='bilinear', align_corners=False)
+        out1 = F.interpolate(self.seg_head1(dec1_out), size=x.shape[2:], mode='bilinear', align_corners=False)
+        
+        # Combinar las salidas (puedes elegir solo out1 o una combinación)
+        final_out = (out1 + out2 + out3) / 3 # Promedio 
+
+        #fusion_input = torch.cat([out1, out2, out3], dim=1)  # [B, 3, H, W]
+        #final_out = self.fusion_mlp(fusion_input)            # [B, 1, H, W]
+
+        # Devolver todas las salidas y la final combinada
         return [out1, out2, out3], final_out
 
     def _load_backbone_weights(self, path: str):
