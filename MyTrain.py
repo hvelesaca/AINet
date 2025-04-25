@@ -142,7 +142,7 @@ def val(model, epoch, save_path, writer):
             image = image.cuda()
 
             res, res1 = model(image)
-            combined_res = res[-1] + res1 
+            combined_res = res[1] + res[-1] + res1 
 
             # eval Dice
             res = F.interpolate(combined_res, size=gt.shape[-2:], mode='bilinear', align_corners=False) # Usar gt.shape[-2:] para obtener H, W
@@ -190,7 +190,7 @@ def train(train_loader, model, optimizer, epoch, test_path):
             # ---- loss function ----
             losses = [structure_loss(out, gts) for out in P1]
             loss_P1 = 0
-            gamma = 0.20
+            gamma = 0.25
             #print('iteration num',len(P1))
             for it in range(len(P1)):
                 loss_P1 += (gamma * it) * losses[it]
