@@ -284,8 +284,17 @@ if __name__ == '__main__':
     print("#" * 20, "Start Training", "#" * 20)
     best_mae = 1
     best_epoch = 0
+    cosine_schedule = optim.lr_scheduler.CosineAnnealingLR(optimizer=optimizer, T_max=20, eta_min=1e-5)
+
     for epoch in range(1, opt.epoch):
-        adjust_lr(optimizer, opt.lr, epoch, opt.decay_rate, opt.decay_epoch)        
+         # schedule
+        cosine_schedule.step()
+        writer.add_scalar('learning_rate', cosine_schedule.get_lr()[0], global_step=epoch)
+        logging.info('>>> current lr: {}'.format(cosine_schedule.get_lr()[0]))
+        #adjust_lr(optimizer, opt.lr, epoch, opt.decay_rate, opt.decay_epoch) 
+        
+        # train
         train(train_loader, model, optimizer, epoch, opt.save_path)
         if epoch % opt.epoch_save==0:
+            # validation
             val(model, epoch, opt.save_path, writer)
