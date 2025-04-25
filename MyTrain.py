@@ -11,6 +11,7 @@ import logging
 from tensorboardX import SummaryWriter
 import matplotlib.pyplot as plt
 from lib.mamba_unet import CamouflageDetectionNet  # Añade esta línea
+from torch import optim
 
 #delaited convolution
 #lovasz_hinge
