@@ -10,11 +10,13 @@ from lib.mamba_unet import CamouflageDetectionNet
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--testsize', type=int, default=352, help='testing size default 352')
-parser.add_argument('--pth_path', type=str, default='/kaggle/input/hitnet_paper/other/default/1/Net_epoch_best.pth')
+parser.add_argument('--pth_path', type=str, default='/kaggle/input/avgnet/other/default/1/Net_epoch_best.pth')
+parser.add_argument('--test_path', type=str,default='/kaggle/input/cottonworm4/CottonWorm4_Drive',help='path to testing dataset')
+
 
 opt = parser.parse_args()
 
-for _data_name in ['/kaggle/input/cottonworm4/CottonWorm4_Drive']:
+for _data_name in [opt.test_path]:
     data_path = f'{_data_name}/test'
     save_path = './results/{}/{}/'.format(opt.pth_path.split('/')[-2], _data_name)
     
