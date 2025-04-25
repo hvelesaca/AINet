@@ -169,6 +169,15 @@ class CamouflageDetectionNet(nn.Module):
         self.seg_heads = nn.ModuleList([
             nn.Conv2d(features[i], 1, kernel_size=1) for i in range(3)
         ])
+
+        # Fusión jerárquica aprendida
+        self.fusion_mlp = nn.Sequential(
+            nn.Conv2d(in_channels=3, out_channels=8, kernel_size=3, padding=1, bias=False),
+            nn.BatchNorm2d(8),
+            #nn.ReLU(inplace=True),
+            nn.PReLU(),
+            nn.Conv2d(in_channels=8, out_channels=1, kernel_size=1)
+        )
         
     def forward(self, x: torch.Tensor):
         skips = self.backbone.forward_features(x)
@@ -182,7 +191,11 @@ class CamouflageDetectionNet(nn.Module):
         out2 = F.interpolate(self.seg_heads[1](d2), size=x.shape[2:], mode='bilinear', align_corners=False)
         out3 = F.interpolate(self.seg_heads[2](d3), size=x.shape[2:], mode='bilinear', align_corners=False)
 
-        final_out = (out1 + out2 + out3) / 3
+        #final_out = (out1 + out2 + out3) / 3
+        # --- Fusión Jerárquica ---
+        fusion_input = torch.cat([out1, out2, out3], dim=1)  # [B, 3, H, W]
+        final_out = self.fusion_mlp(fusion_input)            # [B, 1, H, W]
+        
         return [out1, out2, out3], final_out
 
     def _load_backbone_weights(self, path: str):
