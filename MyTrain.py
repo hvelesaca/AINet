@@ -240,15 +240,11 @@ if __name__ == '__main__':
     parser.add_argument('--epoch_save', type=int,default=5, help='every n epochs to save model')
     opt = parser.parse_args()
 
-
     if not os.path.exists(opt.save_path):
         os.makedirs(opt.save_path)
 
-    logging.basicConfig(filename=opt.save_path + 'log.log',
-                        format='[%(asctime)s-%(filename)s-%(levelname)s:%(message)s]',
-                        level=logging.INFO, filemode='a', datefmt='%Y-%m-%d %I:%M:%S %p')
+    logging.basicConfig(filename=opt.save_path + 'log.log', format='[%(asctime)s-%(filename)s-%(levelname)s:%(message)s]', level=logging.INFO, filemode='a', datefmt='%Y-%m-%d %I:%M:%S %p')
     logging.info("Network-Train")
-
 
     # ---- build models ----
     # torch.cuda.set_device(0)  # set your gpu device
@@ -276,6 +272,9 @@ if __name__ == '__main__':
     #print(optimizer)
     image_root = '{}/Imgs/'.format(opt.train_path)
     gt_root = '{}/GT/'.format(opt.train_path)
+
+    print("image_root: ", image_root)
+    print("gt_root: ", gt_root)
 
     train_loader = get_loader(image_root, gt_root, batchsize=opt.batchsize, trainsize=opt.trainsize, augmentation=opt.augmentation)
     total_step = len(train_loader)
