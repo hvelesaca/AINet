@@ -6,21 +6,6 @@ from huggingface_hub import hf_hub_download
 import timm
 from lib.pvtv2 import pvt_v2_b2
 
-# --- Aggregation Block ---
-class AggregationBlock(nn.Module):
-    def __init__(self, in_channels, out_channels=1):
-        super().__init__()
-        self.conv = nn.Sequential(
-            nn.Conv2d(in_channels, in_channels, 3, padding=1),
-            nn.BatchNorm2d(in_channels),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(in_channels, out_channels, 1)
-        )
-
-    def forward(self, features):
-        x = torch.cat(features, dim=1)
-        return self.conv(x)
-
 #https://github.com/Jongchan/attention-module/blob/c06383c514ab0032d044cc6fcd8c8207ea222ea7/MODELS/cbam.py
 class BasicConv(nn.Module):
     def __init__(self, in_planes, out_planes, kernel_size, stride=1, padding=0, dilation=1, groups=1, relu=True, bn=True, bias=False):
@@ -188,7 +173,7 @@ class Mamba_CBAMDecoderBlock(nn.Module):
         return self.cbam(x)    # Refinamiento con CBAM
         
 # Modelo Completo con Deep Supervision y estructura U-Net
-class CamouflageDetectionNetAnt(nn.Module):
+class CamouflageDetectionNet(nn.Module):
     def __init__(self, features=[64, 128, 256, 512], pretrained=True):
         super().__init__()
         self.backbone = pvt_v2_b2()  
@@ -285,142 +270,7 @@ class CamouflageDetectionNetAnt(nn.Module):
             print("✅ Pesos backbone cargados correctamente.")
         except Exception as e:
             print(f"❌ Error cargando pesos backbone: {e}")
-
-
-# --- MultiScale Attention (TA + F-TA + B-TA combined) ---
-class MultiScaleAttention(nn.Module):
-    def __init__(self, channels):
-        super().__init__()
-        self.ta = CBAM(channels)
-        self.f_ta = CBAM(channels)
-        self.b_ta = CBAM(channels)
-        self.conv = nn.Sequential(
-            nn.Conv2d(channels * 3, channels, 1),
-            nn.BatchNorm2d(channels),
-            nn.PReLU()
-        )
-
-    def forward(self, x):
-        ta_out = self.ta(x)
-        fta_out = self.f_ta(x)
-        bta_out = self.b_ta(x)
-        x = torch.cat([ta_out, fta_out, bta_out], dim=1)
-        return self.conv(x)
-
-# --- Decoder Block with Mask Flow ---
-class DecoderBlock(nn.Module):
-    def __init__(self, in_channels, skip_channels, out_channels):
-        super().__init__()
-        self.upsample = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
-        self.conv1 = nn.Conv2d(in_channels + skip_channels, out_channels, 3, padding=1)
-        self.bn1 = nn.BatchNorm2d(out_channels)
-        self.prelu = nn.PReLU()
-        self.mamba_cbam = CBAM(out_channels)
-
-    def forward(self, x, skip):
-        x = self.upsample(x)
-        if skip is not None:
-            x = torch.cat([x, skip], dim=1)
-        x = self.conv1(x)
-        x = self.bn1(x)
-        x = self.prelu(x)
-        x = self.mamba_cbam(x)
-        return x
-
-# --- Full Network ---
-class CamouflageDetectionNet(nn.Module):
-    def __init__(self, encoder_channels=[64, 128, 320, 512], decoder_channels=[64, 128, 256, 512], pretrained=True):
-        super().__init__()
         
-        # Assume encoder is defined elsewhere (PVTv2 + Mamba + CBAM backbone)
-        self.encoder = YourEncoder()
-
-        # Decoder Blocks
-        self.decoder4 = DecoderBlock(encoder_channels[3], encoder_channels[2], decoder_channels[3])
-        self.decoder3 = DecoderBlock(decoder_channels[3], encoder_channels[1], decoder_channels[2])
-        self.decoder2 = DecoderBlock(decoder_channels[2], encoder_channels[0], decoder_channels[1])
-        self.decoder1 = DecoderBlock(decoder_channels[1], 0, decoder_channels[0])
-
-        # Multi-Scale Attention Modules
-        self.msa4 = MultiScaleAttention(decoder_channels[3])
-        self.msa3 = MultiScaleAttention(decoder_channels[2])
-        self.msa2 = MultiScaleAttention(decoder_channels[1])
-        self.msa1 = MultiScaleAttention(decoder_channels[0])
-
-        # Deep Supervision Heads
-        self.pred4 = nn.Conv2d(decoder_channels[3], 1, 1)
-        self.pred3 = nn.Conv2d(decoder_channels[2], 1, 1)
-        self.pred2 = nn.Conv2d(decoder_channels[1], 1, 1)
-        self.pred1 = nn.Conv2d(decoder_channels[0], 1, 1)
-
-        # Aggregation Block
-        self.aggregation = AggregationBlock(4, 1)
-
-    def forward(self, x):
-        # Encoder
-        e1, e2, e3, e4 = self.encoder(x)
-
-        # Decoder with Mask Flows and Multi-Scale Attention
-        d4 = self.decoder4(e4, e3)
-        d4 = self.msa4(d4)
-        p4 = self.pred4(d4)
-
-        d3 = self.decoder3(d4, e2)
-        d3 = self.msa3(d3)
-        p3 = self.pred3(d3)
-
-        d2 = self.decoder2(d3, e1)
-        d2 = self.msa2(d2)
-        p2 = self.pred2(d2)
-
-        d1 = self.decoder1(d2, None)
-        d1 = self.msa1(d1)
-        p1 = self.pred1(d1)
-
-        # Upsample all outputs to input size
-        p4 = F.interpolate(p4, size=x.size()[2:], mode='bilinear', align_corners=True)
-        p3 = F.interpolate(p3, size=x.size()[2:], mode='bilinear', align_corners=True)
-        p2 = F.interpolate(p2, size=x.size()[2:], mode='bilinear', align_corners=True)
-        p1 = F.interpolate(p1, size=x.size()[2:], mode='bilinear', align_corners=True)
-
-        # Aggregation
-        out = self.aggregation([p1, p2, p3, p4])
-
-        return [p1, p2, p3, p4], out
-    
-            
-# --- Placeholder Encoder ---
-class YourEncoder(nn.Module):
-    def __init__(self):
-        super().__init__()
-
-        self.backbone = pvt_v2_b2()  
-        #if pretrained:
-        self._load_backbone_weights('/kaggle/input/pretrained_pvt_v2_b2/pytorch/default/1/pvt_v2_b2.pth')      
-                
-        out_channels = [64, 128, 320, 512] #self.backbone.out_channels 
-        features=[64, 128, 256, 512]
-        
-        # --- Encoder Path ---
-        self.stage1 = Mamba_CBAMEncoderBlock(out_channels[0], features[0])
-        self.stage2 = Mamba_CBAMEncoderBlock(out_channels[1], features[1])
-        self.stage3 = Mamba_CBAMEncoderBlock(out_channels[2], features[2])
-        self.stage4 = Mamba_CBAMEncoderBlock(out_channels[3], features[3])
-
-    def forward(self, x):
-        e1 = self.stage1(x)
-        e2 = self.stage2(e1)
-        e3 = self.stage3(e2)
-        e4 = self.stage4(e3)
-        return e1, e2, e3, e4
-    def _load_backbone_weights(self, path: str):
-        try:
-            state_dict = torch.load(path, map_location='cpu')
-            self.backbone.load_state_dict(state_dict, strict=False)
-            print("✅ Pesos backbone cargados correctamente.")
-        except Exception as e:
-            print(f"❌ Error cargando pesos backbone: {e}")  
-            
 # Ejemplo de uso optimizado
 if __name__ == "__main__":
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
