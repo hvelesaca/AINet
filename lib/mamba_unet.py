@@ -386,7 +386,7 @@ class CamouflageDetectionNet(nn.Module):
         # Aggregation
         out = self.aggregation([p1, p2, p3, p4])
 
-        return out, [p1, p2, p3, p4]
+        return [p1, p2, p3, p4], out
 
 # --- Placeholder Encoder ---
 class YourEncoder(nn.Module):
