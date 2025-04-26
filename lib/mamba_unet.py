@@ -399,7 +399,8 @@ class YourEncoder(nn.Module):
         self._load_backbone_weights('/kaggle/input/pretrained_pvt_v2_b2/pytorch/default/1/pvt_v2_b2.pth')      
                 
         out_channels = [64, 128, 320, 512] #self.backbone.out_channels 
-
+        features=[64, 128, 256, 512]
+        
         # --- Encoder Path ---
         self.stage1 = Mamba_CBAMEncoderBlock(out_channels[0], features[0])
         self.stage2 = Mamba_CBAMEncoderBlock(out_channels[1], features[1])
