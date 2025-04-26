@@ -387,13 +387,7 @@ class CamouflageDetectionNet(nn.Module):
         out = self.aggregation([p1, p2, p3, p4])
 
         return [p1, p2, p3, p4], out
-    def _load_backbone_weights(self, path: str):
-        try:
-            state_dict = torch.load(path, map_location='cpu')
-            self.backbone.load_state_dict(state_dict, strict=False)
-            print("✅ Pesos backbone cargados correctamente.")
-        except Exception as e:
-            print(f"❌ Error cargando pesos backbone: {e}")  
+    
             
 # --- Placeholder Encoder ---
 class YourEncoder(nn.Module):
@@ -418,7 +412,13 @@ class YourEncoder(nn.Module):
         e3 = self.stage3(e2)
         e4 = self.stage4(e3)
         return e1, e2, e3, e4
-    
+    def _load_backbone_weights(self, path: str):
+        try:
+            state_dict = torch.load(path, map_location='cpu')
+            self.backbone.load_state_dict(state_dict, strict=False)
+            print("✅ Pesos backbone cargados correctamente.")
+        except Exception as e:
+            print(f"❌ Error cargando pesos backbone: {e}")  
             
 # Ejemplo de uso optimizado
 if __name__ == "__main__":
