@@ -329,7 +329,7 @@ class DecoderBlock(nn.Module):
 
 # --- Full Network ---
 class CamouflageDetectionNet(nn.Module):
-    def __init__(self, encoder_channels=[64, 128, 320, 512], decoder_channels=[64, 128, 256, 512]):
+    def __init__(self, encoder_channels=[64, 128, 320, 512], decoder_channels=[64, 128, 256, 512], pretrained=True):
         super().__init__()
         
         # Assume encoder is defined elsewhere (PVTv2 + Mamba + CBAM backbone)
