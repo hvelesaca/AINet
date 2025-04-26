@@ -6,7 +6,6 @@ from huggingface_hub import hf_hub_download
 import timm
 from lib.pvtv2 import pvt_v2_b2
 
-
 # --- Aggregation Block ---
 class AggregationBlock(nn.Module):
     def __init__(self, in_channels, out_channels=1):
@@ -21,7 +20,6 @@ class AggregationBlock(nn.Module):
     def forward(self, features):
         x = torch.cat(features, dim=1)
         return self.conv(x)
-
 
 #https://github.com/Jongchan/attention-module/blob/c06383c514ab0032d044cc6fcd8c8207ea222ea7/MODELS/cbam.py
 class BasicConv(nn.Module):
