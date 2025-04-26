@@ -6,6 +6,21 @@ from huggingface_hub import hf_hub_download
 import timm
 from lib.pvtv2 import pvt_v2_b2
 
+# --- Aggregation Block ---
+class AggregationBlock(nn.Module):
+    def __init__(self, in_channels, out_channels=1):
+        super().__init__()
+        self.conv = nn.Sequential(
+            nn.Conv2d(in_channels, in_channels, 3, padding=1),
+            nn.BatchNorm2d(in_channels),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(in_channels, out_channels, 1)
+        )
+
+    def forward(self, features):
+        x = torch.cat(features, dim=1)
+        return self.conv(x)
+
 #pvt_v2_variants = [#'pvt_v2_b0',#'pvt_v2_b1',#'pvt_v2_b2', # La que usaste#'pvt_v2_b3',#'pvt_v2_b4',#'pvt_v2_b5',#]
 class PVTBackbone(nn.Module):
     def __init__(self, model_name="pvt_v2_b2", pretrained=True):
@@ -223,6 +238,9 @@ class CamouflageDetectionNet(nn.Module):
         self.seg_head3 = nn.Conv2d(features[2], 1, kernel_size=1) # Output from decoder3
         self.seg_head2 = nn.Conv2d(features[1], 1, kernel_size=1) # Output from decoder2
         self.seg_head1 = nn.Conv2d(features[0], 1, kernel_size=1) # Output from decoder1
+
+        # Aggregation Block
+        self.aggregation = AggregationBlock(4, 1)
         
         #self.encoders = nn.ModuleList([
         #    MambaConvBlock(out_channels[i], features[i]) for i in range(4)
@@ -278,9 +296,12 @@ class CamouflageDetectionNet(nn.Module):
         out3 = F.interpolate(self.seg_head3(dec3_out), size=x.shape[2:], mode='bilinear', align_corners=False)
         out2 = F.interpolate(self.seg_head2(dec2_out), size=x.shape[2:], mode='bilinear', align_corners=False)
         out1 = F.interpolate(self.seg_head1(dec1_out), size=x.shape[2:], mode='bilinear', align_corners=False)
+
+        # Aggregation
+        out = self.aggregation([p1, p2, p3, p4])
         
         # Combinar las salidas (puedes elegir solo out1 o una combinación)
-        final_out = (out1 + out2 + out3) / 3 # Promedio 
+        #final_out = (out1 + out2 + out3) / 3 # Promedio 
 
         #fusion_input = torch.cat([out1, out2, out3], dim=1)  # [B, 3, H, W]
         #final_out = self.fusion_mlp(fusion_input)            # [B, 1, H, W]
