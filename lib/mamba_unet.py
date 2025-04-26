@@ -298,7 +298,7 @@ class CamouflageDetectionNet(nn.Module):
         out1 = F.interpolate(self.seg_head1(dec1_out), size=x.shape[2:], mode='bilinear', align_corners=False)
 
         # Aggregation
-        out = self.aggregation([p1, p2, p3, p4])
+        final_out = self.aggregation([out1, out2, out3])
         
         # Combinar las salidas (puedes elegir solo out1 o una combinación)
         #final_out = (out1 + out2 + out3) / 3 # Promedio 
