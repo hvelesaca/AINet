@@ -329,9 +329,9 @@ class DecoderBlock(nn.Module):
 
 # --- Full Network ---
 class CamouflageDetectionNet(nn.Module):
-    def __init__(self, encoder_channels, decoder_channels):
+    def __init__(self, encoder_channels=[64, 128, 320, 512], decoder_channels=[64, 128, 256, 512]):
         super().__init__()
-
+        
         # Assume encoder is defined elsewhere (PVTv2 + Mamba + CBAM backbone)
         self.encoder = YourEncoder()
 
@@ -394,8 +394,8 @@ class YourEncoder(nn.Module):
         super().__init__()
 
         self.backbone = pvt_v2_b2()  
-        if pretrained:
-            self._load_backbone_weights('/kaggle/input/pretrained_pvt_v2_b2/pytorch/default/1/pvt_v2_b2.pth')      
+        #if pretrained:
+        self._load_backbone_weights('/kaggle/input/pretrained_pvt_v2_b2/pytorch/default/1/pvt_v2_b2.pth')      
                 
         out_channels = [64, 128, 320, 512] #self.backbone.out_channels 
 
