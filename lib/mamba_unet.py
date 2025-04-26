@@ -214,7 +214,7 @@ class CamouflageDetectionNet(nn.Module):
     def __init__(self, features=[64, 128, 256, 512], pretrained=True):
         super().__init__()
 
-        self.backbone = PVTBackbone("pvt_v2_b4", pretrained=True)
+        self.backbone = PVTBackbone("pvt_v2_b3", pretrained=True)
         out_channels = self.backbone.out_channels  # [96, 192, 384, 768]
         
         #self.backbone = pvt_v2_b2()  
