@@ -143,11 +143,10 @@ def val(model, epoch, save_path, writer):
             image = image.cuda()
 
             res, res1 = model(image)
-            combined_res = res[1] + res[-1] + res1 
+            combined_res = res[1] + res[2] + res[3] + res1 
 
             # eval Dice
             res = F.interpolate(combined_res, size=gt.shape[-2:], mode='bilinear', align_corners=False) # Usar gt.shape[-2:] para obtener H, W
-            #res = F.upsample(combined_res, size=gt.shape, mode='bilinear', align_corners=False)
             res = res.sigmoid().data.cpu().numpy().squeeze()
             res = (res - res.min()) / (res.max() - res.min() + 1e-8)
             mae_sum += np.sum(np.abs(res - gt)) * 1.0 / (gt.shape[0] * gt.shape[1])
