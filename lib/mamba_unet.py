@@ -170,6 +170,19 @@ class AttentionDecoderBlock(nn.Module):
         x = self.cbam(x)
         return self.conv(x)
 
+# Simple Decoder Block with UMamba (No CBAM)
+class SimpleDecoderBlock(nn.Module):
+    def __init__(self, in_channels: int, out_channels: int):
+        super().__init__()
+        self.up = nn.ConvTranspose2d(in_channels, out_channels, kernel_size=2, stride=2)
+        self.umamba_block = UMambaConvBlock(out_channels * 2, out_channels)
+
+    def forward(self, x: torch.Tensor, skip: torch.Tensor) -> torch.Tensor:
+        x = self.up(x)
+        x = torch.cat([x, skip], dim=1)  # concatenar skip connection
+        x = self.umamba_block(x)
+        return x
+
 # Modelo Completo con Deep Supervision y estructura U-Net
 class CamouflageDetectionNet(nn.Module):
     def __init__(self, features=[64, 128, 256, 512], pretrained=True):
@@ -185,9 +198,9 @@ class CamouflageDetectionNet(nn.Module):
         ])
 
         self.decoders = nn.ModuleList([
-            AttentionDecoderBlock(features[3], features[2]),
-            AttentionDecoderBlock(features[2], features[1]),
-            AttentionDecoderBlock(features[1], features[0])
+            SimpleDecoderBlock(features[3], features[2]),
+            SimpleDecoderBlock(features[2], features[1]),
+            SimpleDecoderBlock(features[1], features[0])
         ])
 
         self.seg_heads = nn.ModuleList([
