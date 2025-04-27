@@ -120,54 +120,6 @@ class UMambaConvBlock(nn.Module):
 
         return x
 
-# Mamba Convolutional Block
-class MambaConvBlock(nn.Module):
-    def __init__(self, in_channels: int, out_channels: int, stride: int = 1, mamba_dim: int = 64):
-        super().__init__()
-        self.conv = nn.Sequential(
-            nn.Conv2d(in_channels, out_channels, 3, stride, 1, bias=False),
-            nn.BatchNorm2d(out_channels),
-            nn.ReLU(inplace=True)
-        )
-        self.pool = nn.AdaptiveAvgPool2d((16, 16))
-        self.mamba = Mamba(d_model=out_channels, d_state=mamba_dim, d_conv=4, expand=2)
-        self.residual = nn.Identity()
-        if stride != 1 or in_channels != out_channels:
-            self.residual = nn.Sequential(
-                nn.Conv2d(in_channels, out_channels, 1, stride, bias=False),
-                nn.BatchNorm2d(out_channels)
-            )
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        identity = self.residual(x)
-        x = self.conv(x)
-        B, C, H, W = x.shape
-        x_pooled = self.pool(x).flatten(2).transpose(1, 2)
-        x_mamba = self.mamba(x_pooled).transpose(1, 2).view(B, C, 16, 16)
-        x_mamba = F.interpolate(x_mamba, size=(H, W), mode='bilinear', align_corners=False)
-        return F.relu(x_mamba + identity)
-
-# Attention Decoder Block with CBAM
-class AttentionDecoderBlock(nn.Module):
-    def __init__(self, in_channels: int, out_channels: int):
-        super().__init__()
-        self.up = nn.ConvTranspose2d(in_channels, out_channels, 2, stride=2)
-        self.cbam = CBAM(out_channels * 2)
-        self.conv = nn.Sequential(
-            nn.Conv2d(out_channels * 2, out_channels, 3, padding=1, bias=False),
-            nn.BatchNorm2d(out_channels),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(out_channels, out_channels, 3, padding=1, bias=False),
-            nn.BatchNorm2d(out_channels),
-            nn.ReLU(inplace=True)
-        )
-
-    def forward(self, x: torch.Tensor, skip: torch.Tensor) -> torch.Tensor:
-        x = self.up(x)
-        x = torch.cat([x, skip], dim=1)
-        x = self.cbam(x)
-        return self.conv(x)
-
 # Simple Decoder Block with UMamba (No CBAM)
 class SimpleDecoderBlock(nn.Module):
     def __init__(self, in_channels: int, out_channels: int):
