@@ -6,93 +6,39 @@ from huggingface_hub import hf_hub_download
 import timm
 from lib.pvtv2 import pvt_v2_b2
 
-# U-Mamba Block (3D Adaptado)
 class UMambaConvBlock(nn.Module):
-    def __init__(self, in_channels: int, out_channels: int, stride: int = 1, mamba_dim: int = 64, expand_ratio: int = 2):
+    def __init__(self, in_channels: int, out_channels: int, mamba_dim: int = 64):
         super().__init__()
-        self.stride = stride
         self.in_channels = in_channels
         self.out_channels = out_channels
-
-        # Primer bloque de convolución 2D (como tu MambaConvBlock original)
+        self.proj_in = nn.Linear(in_channels, out_channels)  # PROYECTAR ENTRADA
+        self.silu = nn.SiLU()
+        self.ssm = Mamba(d_model=out_channels, d_state=mamba_dim, d_conv=4, expand=2)
+        self.proj_out = nn.Linear(out_channels, out_channels)  # PROYECTAR SALIDA
+        self.layer_norm = nn.LayerNorm(out_channels)
         self.conv = nn.Sequential(
-            nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=stride, padding=1, bias=False),
-            nn.BatchNorm2d(out_channels),
-            nn.ReLU(inplace=True)
-        )
-        
-        # Preparamos la expansión de dimensión
-        self.expand_linear = nn.Linear(out_channels, out_channels * expand_ratio)
-        self.project_linear = nn.Linear(out_channels * expand_ratio, out_channels)
-        
-        # 1D Conv + Mamba
-        self.conv1d = nn.Conv1d(out_channels * expand_ratio, out_channels * expand_ratio, kernel_size=1, bias=False)
-        self.mamba = Mamba(
-            d_model=out_channels * expand_ratio, 
-            d_state=mamba_dim, 
-            d_conv=4, 
-            expand=2
-        )
-        
-        # Normalización
-        self.norm = nn.LayerNorm(out_channels)
-
-        # Bloque residual final
-        self.residual_conv = nn.Sequential(
             nn.InstanceNorm2d(out_channels, affine=True),
-            nn.Conv2d(out_channels, out_channels, kernel_size=1, stride=1, bias=False),
-            nn.LeakyReLU(inplace=True)
+            nn.LeakyReLU(inplace=True),
+            nn.Conv2d(out_channels, out_channels, kernel_size=3, stride=1, padding=1)
         )
-
-        self.residual = nn.Identity()
-        if stride != 1 or in_channels != out_channels:
-            self.residual = nn.Sequential(
-                nn.Conv2d(in_channels, out_channels, 1, stride, bias=False),
-                nn.BatchNorm2d(out_channels)
-            )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        identity = self.residual(x)
-
-        # Primer paso: convolución normal
-        x = self.conv(x)
-
         B, C, H, W = x.shape
-        L = H * W
+        x = x.view(B, C, H * W).permute(0, 2, 1)  # (B, L, C)
 
-        # Reestructuramos
-        x_flat = x.view(B, C, -1).transpose(1, 2)  # (B, L, C)
+        # Ajuste de dimensiones
+        x = self.proj_in(x)
+        x = self.silu(x)
+        x = self.ssm(x)
+        x = self.proj_out(x)
 
-        # Expandir
-        x_expanded = self.expand_linear(x_flat)
+        x = self.layer_norm(x)
+        x = x.permute(0, 2, 1).view(B, self.out_channels, H, W)  # (B, C, H, W)
 
-        # Dividir en dos ramas
-        u, v = torch.chunk(x_expanded, 2, dim=-1)
-        u = F.silu(u)
-        v = F.silu(v)
+        # Segundo bloque conv (como tu diagrama dice)
+        x = self.conv(x)
+        return x
 
-        # Procesar v
-        v = v.transpose(1, 2)  # (B, C', L)
-        v = self.conv1d(v)
-        v = v.transpose(1, 2)  # (B, L, C')
-        v = self.mamba(v)
-
-        # Fusionar
-        x_fused = u * v
-
-        # Proyecto de regreso
-        x_projected = self.project_linear(x_fused)
-
-        # Normalizar
-        x_norm = self.norm(x_projected)
-
-        # Volver a 2D
-        x_out = x_norm.transpose(1, 2).view(B, C, H, W)
-
-        # Residual block
-        x_out = self.residual_conv(x_out)
-
-        return F.relu(x_out + identity)
 
 # CBAM Attention Module
 class CBAM(nn.Module):
