@@ -25,71 +25,7 @@ class ResidualBlock(nn.Module):
         x = self.norm(x)
         x = self.act(x)
         return x + residual
-
-# UMambaConvBlock actualizado
-class UMambaConvBlock(nn.Module):
-    def __init__(self, in_channels: int, out_channels: int, mamba_dim: int = 64):
-        super().__init__()
-
-        self.project_in = nn.Conv2d(in_channels, out_channels, kernel_size=1, bias=False)
-
-        self.res_block1 = ResidualBlock(out_channels)
-        self.res_block2 = ResidualBlock(out_channels)
-
-        self.layer_norm = nn.LayerNorm(out_channels)
-
-        # Branch 1
-        self.linear1_branch1 = nn.Linear(out_channels, out_channels)
-        self.conv1d_branch1 = nn.Conv1d(out_channels, out_channels, kernel_size=1)
-        self.act_branch1 = nn.SiLU()
-        self.mamba = Mamba(d_model=out_channels, d_state=mamba_dim, d_conv=4, expand=2)
-
-        # Branch 2
-        self.linear1_branch2 = nn.Linear(out_channels, out_channels)
-        self.act_branch2 = nn.SiLU()
-
-        # Final projection
-        self.linear2 = nn.Linear(out_channels, out_channels)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        B, _, H, W = x.shape
-
-        # Step 0: Project input if in_channels != out_channels
-        x = self.project_in(x)
-
-        # Step 1: Two Residual Blocks
-        x = self.res_block1(x)
-        x = self.res_block2(x)
-
-        # Step 2: Flatten and Permute
-        x = x.flatten(2).transpose(1, 2)  # (B, C, H*W) -> (B, H*W, C)
-
-        # Step 3: LayerNorm
-        x = self.layer_norm(x)
-
-        # Step 4: Split into two branches
-        # Branch 1
-        branch1 = self.linear1_branch1(x)
-        branch1 = branch1.transpose(1, 2)  # (B, C, L)
-        branch1 = self.conv1d_branch1(branch1)
-        branch1 = branch1.transpose(1, 2)  # (B, L, C)
-        branch1 = self.act_branch1(branch1)
-        branch1 = self.mamba(branch1)
-
-        # Branch 2
-        branch2 = self.linear1_branch2(x)
-        branch2 = self.act_branch2(branch2)
-
-        # Step 5: Hadamard Product
-        x = branch1 * branch2
-
-        # Step 6: Linear Projection
-        x = self.linear2(x)
-
-        # Step 7: Reshape back
-        x = x.transpose(1, 2).view(B, -1, H, W)
-        return x
-
+        
 # CBAM Attention Module
 class CBAM(nn.Module):
     def __init__(self, channels: int, reduction: int = 16):
