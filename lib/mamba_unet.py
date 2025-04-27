@@ -90,42 +90,6 @@ class UMambaConvBlock(nn.Module):
         x = x.transpose(1, 2).view(B, -1, H, W)
         return x
 
-
-
-class UMambaConvBlockAnt(nn.Module):
-    def __init__(self, in_channels: int, out_channels: int, mamba_dim: int = 64):
-        super().__init__()
-        self.in_channels = in_channels
-        self.out_channels = out_channels
-        self.proj_in = nn.Linear(in_channels, out_channels)  # PROYECTAR ENTRADA
-        self.silu = nn.SiLU()
-        self.ssm = Mamba(d_model=out_channels, d_state=mamba_dim, d_conv=4, expand=2)
-        self.proj_out = nn.Linear(out_channels, out_channels)  # PROYECTAR SALIDA
-        self.layer_norm = nn.LayerNorm(out_channels)
-        self.conv = nn.Sequential(
-            nn.InstanceNorm2d(out_channels, affine=True),
-            nn.LeakyReLU(inplace=True),
-            nn.Conv2d(out_channels, out_channels, kernel_size=3, stride=1, padding=1)
-        )
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        B, C, H, W = x.shape
-        x = x.view(B, C, H * W).permute(0, 2, 1)  # (B, L, C)
-
-        # Ajuste de dimensiones
-        x = self.proj_in(x)
-        x = self.silu(x)
-        x = self.ssm(x)
-        x = self.proj_out(x)
-
-        x = self.layer_norm(x)
-        x = x.permute(0, 2, 1).view(B, self.out_channels, H, W)  # (B, C, H, W)
-
-        # Segundo bloque conv (como tu diagrama dice)
-        x = self.conv(x)
-        return x
-
-
 # CBAM Attention Module
 class CBAM(nn.Module):
     def __init__(self, channels: int, reduction: int = 16):
@@ -153,6 +117,72 @@ class CBAM(nn.Module):
         max_out, _ = torch.max(x, dim=1, keepdim=True)
         spatial_attn = self.spatial_attention(torch.cat([avg_out, max_out], dim=1))
         return x * spatial_attn
+
+class UMambaConvBlock(nn.Module):
+    def __init__(self, in_channels: int, out_channels: int, mamba_dim: int = 64, use_cbam: bool = True):
+        super().__init__()
+        self.project_in = nn.Conv2d(in_channels, out_channels, kernel_size=1, bias=False)
+
+        self.res_block1 = ResidualBlock(out_channels)
+        self.res_block2 = ResidualBlock(out_channels)
+
+        self.layer_norm = nn.LayerNorm(out_channels)
+
+        # Branch 1
+        self.linear1_branch1 = nn.Linear(out_channels, out_channels)
+        self.conv1d_branch1 = nn.Conv1d(out_channels, out_channels, kernel_size=1)
+        self.act_branch1 = nn.SiLU()
+        self.mamba = Mamba(d_model=out_channels, d_state=mamba_dim, d_conv=4, expand=2)
+
+        # Branch 2
+        self.linear1_branch2 = nn.Linear(out_channels, out_channels)
+        self.act_branch2 = nn.SiLU()
+
+        # Final projection
+        self.linear2 = nn.Linear(out_channels, out_channels)
+
+        # CBAM (opcional)
+        self.use_cbam = use_cbam
+        if self.use_cbam:
+            self.cbam = CBAM(out_channels)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        B, _, H, W = x.shape
+        # Step 0: Project input if in_channels != out_channels
+        x = self.project_in(x)
+
+        # Step 1: Two Residual Blocks
+        x = self.res_block1(x)
+        x = self.res_block2(x)
+
+        # Step 2: Flatten and Permute
+        x = x.flatten(2).transpose(1, 2)  # (B, L, C)
+        # Step 3: LayerNorm
+        x = self.layer_norm(x)
+
+        # Step 4: Split into two branches
+        # Branch 1
+        branch1 = self.linear1_branch1(x)
+        branch1 = branch1.transpose(1, 2)
+        branch1 = self.conv1d_branch1(branch1)
+        branch1 = branch1.transpose(1, 2)
+        branch1 = self.act_branch1(branch1)
+        branch1 = self.mamba(branch1)
+        # Branch 2
+        branch2 = self.linear1_branch2(x)
+        branch2 = self.act_branch2(branch2)
+        # Step 5: Hadamard Product
+        x = branch1 * branch2
+        # Step 6: Linear Projection
+        x = self.linear2(x)
+        # Step 7: Reshape back
+        x = x.transpose(1, 2).view(B, -1, H, W)
+
+        # Aplicar CBAM solo si está activo
+        if self.use_cbam:
+            x = self.cbam(x)
+
+        return x
 
 # Mamba Convolutional Block
 class MambaConvBlock(nn.Module):
