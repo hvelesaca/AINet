@@ -134,7 +134,7 @@ class SimpleDecoderBlock(nn.Module):
         return x
 
 # Modelo Completo con Deep Supervision y estructura U-Net
-class CamouflageDetectionNet(nn.Module):
+class CamouflageDetectionNetAnt(nn.Module):
     def __init__(self, features=[64, 128, 256, 512], pretrained=True):
         super().__init__()
         self.backbone = pvt_v2_b2()  
@@ -179,7 +179,94 @@ class CamouflageDetectionNet(nn.Module):
             print("✅ Pesos backbone cargados correctamente.")
         except Exception as e:
             print(f"❌ Error cargando pesos backbone: {e}")
-        
+
+
+# --- Nuevo bloque para Feature Aggregation ---
+class FeatureAggregation(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super().__init__()
+        self.conv1x1 = nn.Conv2d(in_channels, out_channels, kernel_size=1)
+        self.conv3x3 = nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1)
+
+    def forward(self, features):
+        x = torch.cat(features, dim=1)
+        x = self.conv1x1(x)
+        x = self.conv3x3(x)
+        return x
+
+# --- Decoder Block modificado ---
+class AdvancedDecoderBlock(nn.Module):
+    def __init__(self, in_channels, skip_channels, out_channels):
+        super().__init__()
+        self.upsample = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=False)
+        self.aggr = FeatureAggregation(in_channels + skip_channels, out_channels)
+        self.umamba_block = UMambaConvBlock(out_channels, out_channels)
+
+    def forward(self, x, skips):
+        x = self.upsample(x)
+        skips = [F.interpolate(feat, size=x.shape[2:], mode='bilinear', align_corners=False) for feat in skips]
+        x = self.aggr([x] + skips)
+        x = self.umamba_block(x)
+        return x
+
+# --- Modelo Completo ---
+class CamouflageDetectionNet(nn.Module):
+    def __init__(self, features=[64, 128, 256, 512], pretrained=True):
+        super().__init__()
+        self.backbone = pvt_v2_b2()
+        if pretrained:
+            self._load_backbone_weights('/kaggle/input/pretrained_pvt_v2_b2/pytorch/default/1/pvt_v2_b2.pth')
+
+        out_channels = [64, 128, 320, 512] 
+
+        self.encoders = nn.ModuleList([
+            UMambaConvBlock(out_channels[i], features[i]) for i in range(4)
+        ])
+
+        self.decoder3 = AdvancedDecoderBlock(features[3], features[2], features[2])
+        self.decoder2 = AdvancedDecoderBlock(features[2], features[1], features[1])
+        self.decoder1 = AdvancedDecoderBlock(features[1], features[0], features[0])
+
+        self.final_decoder = UMambaConvBlock(features[0], features[0])
+
+        self.seg_heads = nn.ModuleList([
+            nn.Conv2d(features[2], 1, kernel_size=1),
+            nn.Conv2d(features[1], 1, kernel_size=1),
+            nn.Conv2d(features[0], 1, kernel_size=1),
+            nn.Conv2d(features[0], 1, kernel_size=1),
+        ])
+
+    def forward(self, x: torch.Tensor):
+        # Backbone features
+        skips = self.backbone.forward_features(x)
+        enc_feats = [enc(skip) for enc, skip in zip(self.encoders, skips)]
+
+        # Decoder path
+        d3 = self.decoder3(enc_feats[3], [enc_feats[2]])
+        d2 = self.decoder2(d3, [enc_feats[1]])
+        d1 = self.decoder1(d2, [enc_feats[0]])
+
+        d0 = self.final_decoder(d1)
+
+        # Deep supervision
+        out3 = F.interpolate(self.seg_heads[0](d3), size=x.shape[2:], mode='bilinear', align_corners=False)
+        out2 = F.interpolate(self.seg_heads[1](d2), size=x.shape[2:], mode='bilinear', align_corners=False)
+        out1 = F.interpolate(self.seg_heads[2](d1), size=x.shape[2:], mode='bilinear', align_corners=False)
+        out0 = F.interpolate(self.seg_heads[3](d0), size=x.shape[2:], mode='bilinear', align_corners=False)
+
+        final_out = (out0 + out1 + out2 + out3) / 4
+
+        return [out0, out1, out2, out3], final_out
+
+    def _load_backbone_weights(self, path: str):
+        try:
+            state_dict = torch.load(path, map_location='cpu')
+            self.backbone.load_state_dict(state_dict, strict=False)
+            print("✅ Pesos backbone cargados correctamente.")
+        except Exception as e:
+            print(f"❌ Error cargando pesos backbone: {e}")
+
+
 # Ejemplo de uso optimizado
 if __name__ == "__main__":
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
