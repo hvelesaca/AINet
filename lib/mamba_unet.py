@@ -6,11 +6,6 @@ from huggingface_hub import hf_hub_download
 import timm
 from lib.pvtv2 import pvt_v2_b2
 
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from mamba_ssm import Mamba
-
 # Residual Block (Conv + InstanceNorm + LeakyReLU + Residual)
 class ResidualBlock(nn.Module):
     def __init__(self, channels):
