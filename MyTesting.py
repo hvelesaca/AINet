@@ -29,18 +29,30 @@ for _data_name in [opt.test_path]:
     os.makedirs(save_path, exist_ok=True)
     image_root = '{}/Imgs/'.format(data_path)
     gt_root = '{}/GT/'.format(data_path)
-    print('root',image_root,gt_root)
-    test_loader = My_test_dataset(image_root, gt_root, opt.testsize)
+    edge_root = '{}/Edge/'.format(data_path)
+    
+    print('root_image',image_root)
+    print('gt',gt_root)
+    print('edge',edge_root)
+    
+    test_loader = My_test_dataset(image_root, gt_root, edge_root, opt.testsize)
     print('****',test_loader.size)
     for i in range(test_loader.size):
-        image, gt, name = test_loader.load_data()
+        image, gt, edge, name = test_loader.load_data()
         print('***name',name)
         gt = np.asarray(gt, np.float32)
         gt /= (gt.max() + 1e-8)
         image = image.cuda()
 
-        P1, P2 = model(image)
+        P_edge, P1, P2 = model(image)
 
+        os.makedirs(save_path+"/edge", exist_ok=True)
+        res = F.upsample(P_edge, size=gt.shape, mode='bilinear', align_corners=False)
+        res = res.sigmoid().data.cpu().numpy().squeeze()
+        res = (res - res.min()) / (res.max() - res.min() + 1e-8)
+        print('> {} - {}'.format(_data_name, name))
+        cv2.imwrite(save_path+"/edge/"+name,res*255)
+        
         os.makedirs(save_path+"/out3final", exist_ok=True)
         res = F.upsample(P1[3] + P2, size=gt.shape, mode='bilinear', align_corners=False)
         res = res.sigmoid().data.cpu().numpy().squeeze()
