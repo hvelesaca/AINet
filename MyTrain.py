@@ -144,6 +144,7 @@ def val(model, epoch, save_path, writer):
     model.eval()
     with torch.no_grad():
         mae_sum = 0
+        dice_sum =0
         test_loader = test_dataset(image_root=opt.test_path + '/Imgs/',
                                    gt_root=opt.test_path + '/GT/',
                                    edge_root=opt.test_path + '/Edge/',
