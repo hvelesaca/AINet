@@ -111,6 +111,18 @@ def structure_loss2(pred, mask):
     lovasz = lovasz_hinge(pred, mask)
 
     return (wbce + wiou).mean() + lovasz
+
+def dice_loss(predict, target):
+    smooth = 1
+    p = 2
+    valid_mask = torch.ones_like(target)
+    predict = predict.contiguous().view(predict.shape[0], -1)
+    target = target.contiguous().view(target.shape[0], -1)
+    valid_mask = valid_mask.contiguous().view(valid_mask.shape[0], -1)
+    num = torch.sum(torch.mul(predict, target) * valid_mask, dim=1) * 2 + smooth
+    den = torch.sum((predict.pow(p) + target.pow(p)) * valid_mask, dim=1) + smooth
+    loss = 1 - num / den
+    return loss.mean()
     
 def structure_loss(pred, mask):
     weit = 1 + 5 * torch.abs(F.avg_pool2d(mask, kernel_size=31, stride=1, padding=15) - mask)
@@ -143,7 +155,7 @@ def val(model, epoch, save_path, writer):
             gt /= (gt.max() + 1e-8)
             image = image.cuda()
 
-            res, res1 = model(image)
+            res_edge, res, res1 = model(image)
             combined_res = res[1] + res[2] + res[3] + res1 
 
             # eval Dice
@@ -193,7 +205,7 @@ def train(train_loader, model, optimizer, epoch, test_path):
                 edge = F.upsample(edge, size=(trainsize, trainsize), mode='bilinear', align_corners=True)
             # ---- forward ----
             #print('this is trainsize',trainsize)
-            P1, P2 = model(images)
+            P_edge, P1, P2 = model(images)
             # ---- loss function ----
             losses = [structure_loss(out, gts) for out in P1]
             loss_P1 = 0
