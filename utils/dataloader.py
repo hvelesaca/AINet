@@ -24,7 +24,7 @@ class CODataset(data.Dataset):
         self.transform = self.get_transforms()
 
     def get_transforms(self):
-        additional_targets = {'edge': 'mask'}
+        additional_targets = {'edge': 'mask'}  # <<< ESTO AGREGA el canal 'edge'
 
         if self.augmentations:
             print('Using advanced Albumentations for augmentation')
@@ -40,7 +40,7 @@ class CODataset(data.Dataset):
                 A.Normalize(mean=(0.485, 0.456, 0.406),
                             std=(0.229, 0.224, 0.225)),
                 ToTensorV2()
-            ])
+            ], additional_targets=additional_targets)  # <<< PASA EL additional_targets AQUI
         else:
             print('No augmentation, only resizing and normalization')
             return A.Compose([
@@ -48,7 +48,7 @@ class CODataset(data.Dataset):
                 A.Normalize(mean=(0.485, 0.456, 0.406),
                             std=(0.229, 0.224, 0.225)),
                 ToTensorV2()
-            ])
+            ], additional_targets=additional_targets)  # <<< TAMBIÉN AQUI
 
 
     def __getitem__(self, index):
