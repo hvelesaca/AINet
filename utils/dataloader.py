@@ -10,18 +10,13 @@ import numpy as np
 import torch
 
 class CODataset(data.Dataset):
-    def __init__(self, image_root, gt_root, trainsize, augmentations=True):
+    def __init__(self, image_root, gt_root, edge_root, trainsize, augmentations=True):
         self.trainsize = trainsize
         self.augmentations = augmentations
 
-        self.images = sorted([
-            os.path.join(image_root, f) for f in os.listdir(image_root)
-            if f.lower().endswith(('.jpg', '.png', '.jpeg'))
-        ])
-        self.gts = sorted([
-            os.path.join(gt_root, f) for f in os.listdir(gt_root)
-            if f.lower().endswith(('.jpg', '.png', '.jpeg'))
-        ])
+        self.images = sorted([os.path.join(image_root, f) for f in os.listdir(image_root) if f.lower().endswith(('.jpg', '.png', '.jpeg'))])
+        self.gts = sorted([os.path.join(gt_root, f) for f in os.listdir(gt_root) if f.lower().endswith(('.jpg', '.png', '.jpeg'))])
+        self.edge = sorted([os.path.join(edge_root, f) for f in os.listdir(edge_root) if f.lower().endswith(('.jpg', '.png', '.jpeg'))])
 
         self.filter_files()
         self.size = len(self.images)
@@ -56,6 +51,7 @@ class CODataset(data.Dataset):
     def __getitem__(self, index):
         image = np.array(Image.open(self.images[index]).convert('RGB'))
         gt = np.array(Image.open(self.gts[index]).convert('L'))
+        edge = np.array(Image.open(self.edge[index]).convert('L'))
 
         augmented = self.transform(image=image, mask=gt)
         image = augmented['image']
@@ -64,21 +60,24 @@ class CODataset(data.Dataset):
         return image, gt
 
     def filter_files(self):
-        assert len(self.images) == len(self.gts), "Mismatch between images and ground truths"
-        images, gts = [], []
-        for img_path, gt_path in zip(self.images, self.gts):
+        assert len(self.images) == len(self.gts) and len(self.gts) == len(self.edge), "Mismatch between images and ground truths"
+        
+        images, gts, edge = [], [], []
+        for img_path, gt_path, edge_path in zip(self.images, self.gts, self.edge):
             img = Image.open(img_path)
             gt = Image.open(gt_path)
+            edge = Image.open(edge_path)
             if img.size == gt.size:
                 images.append(img_path)
                 gts.append(gt_path)
-        self.images, self.gts = images, gts
+                edge.append(edge_path)
+        self.images, self.gts, self.edge = images, gts, edge
 
     def __len__(self):
         return self.size
 
-def get_loader(image_root, gt_root, batchsize, trainsize, shuffle=True, num_workers=4, pin_memory=True, augmentation=True):
-    dataset = CODataset(image_root, gt_root, trainsize, augmentation)
+def get_loader(image_root, gt_root, edge_root, batchsize, trainsize, shuffle=True, num_workers=4, pin_memory=True, augmentation=True):
+    dataset = CODataset(image_root, gt_root, edge_root, trainsize, augmentation)
     data_loader = data.DataLoader(dataset=dataset,
                                   batch_size=batchsize,
                                   shuffle=shuffle,
@@ -88,12 +87,16 @@ def get_loader(image_root, gt_root, batchsize, trainsize, shuffle=True, num_work
 
 
 class test_dataset:
-    def __init__(self, image_root, gt_root, testsize):
+    def __init__(self, image_root, gt_root, edge_root, testsize):
         self.testsize = testsize
         self.images = [image_root + f for f in os.listdir(image_root) if f.endswith('.jpg') or f.endswith('.png') or f.endswith('.jpeg') or f.endswith('.JPG')]
         self.gts = [gt_root + f for f in os.listdir(gt_root) if f.endswith('.tif') or f.endswith('.png') or f.endswith('.jpg') or f.endswith('.jpeg') or f.endswith('.JPG')]
+        self.edge = [edge_root + f for f in os.listdir(edge_root) if f.endswith('.tif') or f.endswith('.png') or f.endswith('.jpg') or f.endswith('.jpeg') or f.endswith('.JPG')]
+        
         self.images = sorted(self.images)
         self.gts = sorted(self.gts)
+        self.edge = sorted(self.edge)
+        
         self.transform = transforms.Compose([
             transforms.Resize((self.testsize, self.testsize)),
             transforms.ToTensor(),
@@ -107,6 +110,8 @@ class test_dataset:
         image = self.rgb_loader(self.images[self.index])
         image = self.transform(image).unsqueeze(0)
         gt = self.binary_loader(self.gts[self.index])
+        edge = self.binary_loader(self.edge[self.index])
+        
         name = self.images[self.index].split('/')[-1]
         if name.endswith('.jpg'):
             name = name.split('.jpg')[0] + '.png'
@@ -114,7 +119,7 @@ class test_dataset:
         # self.index = self.index % self.size
         # return image, gt, name
         self.index += 1
-        return image, gt, name
+        return image, gt, edge, name
 
     def rgb_loader(self, path):
         with open(path, 'rb') as f:
@@ -130,17 +135,20 @@ class test_dataset:
         return self.size
 
 class My_test_dataset:
-    def __init__(self, image_root, gt_root, testsize):
+    def __init__(self, image_root, gt_root, edge_root, testsize):
         self.testsize = testsize
         self.images = [image_root + f for f in os.listdir(image_root) if f.endswith('.jpg') or f.endswith('.png') or f.endswith('.jpeg') or f.endswith('.JPG')]
         self.gts = [gt_root + f for f in os.listdir(gt_root) if f.endswith('.tif') or f.endswith('.jpg') or f.endswith('.png') or f.endswith('.jpeg') or f.endswith('.JPG')]
+        self.edge = [edge_root + f for f in os.listdir(edge_root) if f.endswith('.tif') or f.endswith('.jpg') or f.endswith('.png') or f.endswith('.jpeg') or f.endswith('.JPG')]
+        
         self.images = sorted(self.images)
         self.gts = sorted(self.gts)
+        self.edge = sorted(self.edge)
+        
         self.transform = transforms.Compose([
             transforms.Resize((self.testsize, self.testsize)),
             transforms.ToTensor(),
-            transforms.Normalize([0.485, 0.456, 0.406],
-                                 [0.229, 0.224, 0.225])])
+            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
         self.gt_transform = transforms.ToTensor()
         self.size = len(self.images)
         self.index = 0
@@ -149,11 +157,13 @@ class My_test_dataset:
         image = self.rgb_loader(self.images[self.index])
         image = self.transform(image).unsqueeze(0)
         gt = self.binary_loader(self.gts[self.index])
+        edge = self.binary_loader(self.edge[self.index])
+        
         name = self.images[self.index].split('/')[-1]
         if name.endswith('.jpg'):
             name = name.split('.jpg')[0] + '.png'
         self.index += 1
-        return image, gt, name
+        return image, gt, edge, name
 
     def rgb_loader(self, path):
         with open(path, 'rb') as f:
