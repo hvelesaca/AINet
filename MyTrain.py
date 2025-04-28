@@ -134,6 +134,7 @@ def val(model, epoch, save_path, writer):
         mae_sum = 0
         test_loader = test_dataset(image_root=opt.test_path + '/Imgs/',
                                    gt_root=opt.test_path + '/GT/',
+                                   edge_root=opt.test_path + '/Edge/',
                                    testsize=opt.trainsize)
 
         for i in range(test_loader.size):
@@ -278,11 +279,13 @@ if __name__ == '__main__':
     #print(optimizer)
     image_root = '{}/Imgs/'.format(opt.train_path)
     gt_root = '{}/GT/'.format(opt.train_path)
+    edge_root = '{}/Edge/'.format(opt.train_path)
 
     print("image_root: ", image_root)
     print("gt_root: ", gt_root)
+    print("edge_root: ", edge_root)
 
-    train_loader = get_loader(image_root, gt_root, batchsize=opt.batchsize, trainsize=opt.trainsize, augmentation=opt.augmentation)
+    train_loader = get_loader(image_root, gt_root, edge_root, batchsize=opt.batchsize, trainsize=opt.trainsize, augmentation=opt.augmentation)
     total_step = len(train_loader)
 
     writer = SummaryWriter(opt.save_path + 'summary')
