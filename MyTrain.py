@@ -218,7 +218,7 @@ def train(train_loader, model, optimizer, epoch, test_path):
             gamma = 0.25
             #print('iteration num',len(P1))
             for it in range(len(P1)):
-                loss_P1 += (gamma * (it+1)) * losses[it]
+                loss_P1 += (gamma * (it)) * losses[it]
 
             loss_P2 = structure_loss(P2, gts)
 
