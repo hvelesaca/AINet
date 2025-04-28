@@ -187,6 +187,7 @@ def train(train_loader, model, optimizer, epoch, test_path):
     size_rates = [1]
     loss_P1_record = AvgMeter()
     loss_P2_record = AvgMeter()
+    loss_Edge_record = AvgMeter()
         
     for i, pack in enumerate(train_loader, start=1):
         for rate in size_rates:
@@ -206,6 +207,8 @@ def train(train_loader, model, optimizer, epoch, test_path):
             # ---- forward ----
             #print('this is trainsize',trainsize)
             P_edge, P1, P2 = model(images)
+            #Edge loss function
+            loss_Edge = dice_loss(P_edge, edge)
             # ---- loss function ----
             losses = [structure_loss(out, gts) for out in P1]
             loss_P1 = 0
@@ -217,7 +220,7 @@ def train(train_loader, model, optimizer, epoch, test_path):
             loss_P2 = structure_loss(P2, gts)
 
             #loss = loss_P1 + loss_P2
-            loss = 0.7 * loss_P1 + 0.3 * loss_P2
+            loss = 0.7 * loss_P1 + 0.3 * loss_P2 + 0.5 * loss_Edge
 
             # ---- backward ----
             loss.backward()
@@ -227,11 +230,12 @@ def train(train_loader, model, optimizer, epoch, test_path):
             if rate == 1:
                 loss_P1_record.update(loss_P1.data, opt.batchsize)
                 loss_P2_record.update(loss_P2.data, opt.batchsize)
+                loss_Edge_record.update(loss_Edge.data, opt.batchsize)
                 
         # ---- train visualization ----
         if i % 20 == 0 or i == total_step:
-            print('{} Epoch [{:03d}/{:03d}], Step [{:04d}/{:04d}], Loss P1: [{:0.4f}], Loss P2: [{:0.4f}]'.format(datetime.now(), epoch, opt.epoch, i, total_step,loss_P1_record.show(), loss_P2_record.show()))
-            logging.info('{} Epoch [{:03d}/{:03d}], Step [{:04d}/{:04d}], Loss P1: [{:0.4f}], Loss P2: [{:0.4f}]'.format(datetime.now(), epoch, opt.epoch, i, total_step,loss_P1_record.show(), loss_P2_record.show()))
+            print('{} Epoch [{:03d}/{:03d}], Step [{:04d}/{:04d}], Loss P1: [{:0.4f}], Loss P2: [{:0.4f}], Loss Edge: [{:0.4f}]'.format(datetime.now(), epoch, opt.epoch, i, total_step,loss_P1_record.show(), loss_P2_record.show(), loss_Edge_record.show()))
+            logging.info('{} Epoch [{:03d}/{:03d}], Step [{:04d}/{:04d}], Loss P1: [{:0.4f}], Loss P2: [{:0.4f}], Loss Edge: [{:0.4f}]'.format(datetime.now(), epoch, opt.epoch, i, total_step,loss_P1_record.show(), loss_P2_record.show(), loss_Edge_record.show()))
     # save model
     save_path = opt.save_path
     if epoch % opt.epoch_save == 0:
