@@ -323,7 +323,7 @@ class CamouflageDetectionNet(nn.Module):
 
         final_out = (out0 + out1 + out2 + out3) / 4
 
-        out_edge = self.edge_head(final_out)  # salida de bordes
+        out_edge = self.edge_head(out0)  # salida de bordes
 
         return out_edge, [out0, out1, out2, out3], final_out
 
