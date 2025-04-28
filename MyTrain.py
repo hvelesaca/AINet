@@ -201,9 +201,11 @@ def train(train_loader, model, optimizer, epoch, test_path):
             # ---- rescale ----
             trainsize = int(round(opt.trainsize * rate / 32) * 32)
             if rate != 1:
+                print("Resize")
                 images = F.upsample(images, size=(trainsize, trainsize), mode='bilinear', align_corners=True)
                 gts = F.upsample(gts, size=(trainsize, trainsize), mode='bilinear', align_corners=True)
                 edge = F.upsample(edge, size=(trainsize, trainsize), mode='bilinear', align_corners=True)
+
             # ---- forward ----
             #print('this is trainsize',trainsize)
             P_edge, P1, P2 = model(images)
