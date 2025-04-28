@@ -24,6 +24,8 @@ class CODataset(data.Dataset):
         self.transform = self.get_transforms()
 
     def get_transforms(self):
+        additional_targets = {'edge': 'mask'}
+
         if self.augmentations:
             print('Using advanced Albumentations for augmentation')
             return A.Compose([
@@ -48,30 +50,32 @@ class CODataset(data.Dataset):
                 ToTensorV2()
             ])
 
+
     def __getitem__(self, index):
         image = np.array(Image.open(self.images[index]).convert('RGB'))
         gt = np.array(Image.open(self.gts[index]).convert('L'))
         edge = np.array(Image.open(self.edge[index]).convert('L'))
-
-        augmented = self.transform(image=image, mask=gt)
+        
+        augmented = self.transform(image=image, mask=gt, edge=edge)
         image = augmented['image']
-        gt = augmented['mask'].unsqueeze(0).float() / 255.0  # Normalizar máscara a [0,1]
-
-        return image, gt
-
+        gt = augmented['mask'].unsqueeze(0).float() / 255.0
+        edge = augmented['edge'].unsqueeze(0).float() / 255.0  # También normalizamos edge
+        
+        return image, gt, edge
+        
     def filter_files(self):
         assert len(self.images) == len(self.gts) and len(self.gts) == len(self.edge), "Mismatch between images and ground truths"
-        
-        images, gts, edge = [], [], []
+
+        images, gts, edges = [], [], []
         for img_path, gt_path, edge_path in zip(self.images, self.gts, self.edge):
             img = Image.open(img_path)
             gt = Image.open(gt_path)
-            edge = Image.open(edge_path)
-            if img.size == gt.size:
+            edg = Image.open(edge_path)
+            if img.size == gt.size == edg.size:
                 images.append(img_path)
                 gts.append(gt_path)
-                edge.append(edge_path)
-        self.images, self.gts, self.edge = images, gts, edge
+                edges.append(edge_path)
+        self.images, self.gts, self.edge = images, gts, edges
 
     def __len__(self):
         return self.size
