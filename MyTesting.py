@@ -39,14 +39,7 @@ for _data_name in [opt.test_path]:
         gt /= (gt.max() + 1e-8)
         image = image.cuda()
 
-        P_Edge, P1, P2 = model(image)
-
-        os.makedirs(save_path+"/edge", exist_ok=True)
-        res = F.upsample(P_Edge, size=gt.shape, mode='bilinear', align_corners=False)
-        res = res.sigmoid().data.cpu().numpy().squeeze()
-        res = (res - res.min()) / (res.max() - res.min() + 1e-8)
-        print('> {} - {}'.format(_data_name, name))
-        cv2.imwrite(save_path+"/edge/"+name,res*255)
+        P1, P2 = model(image)
 
         os.makedirs(save_path+"/out3final", exist_ok=True)
         res = F.upsample(P1[3] + P2, size=gt.shape, mode='bilinear', align_corners=False)
