@@ -49,14 +49,14 @@ for _data_name in [opt.test_path]:
         #cv2.imwrite(save_path+"/final/"+name,res*255)
 
         os.makedirs(save_path+"/out3final", exist_ok=True)
-        res = F.upsample(P1[-1] + P2, size=gt.shape, mode='bilinear', align_corners=False)
+        res = F.upsample(P1[3] + P2, size=gt.shape, mode='bilinear', align_corners=False)
         res = res.sigmoid().data.cpu().numpy().squeeze()
         res = (res - res.min()) / (res.max() - res.min() + 1e-8)
         print('> {} - {}'.format(_data_name, name))
         cv2.imwrite(save_path+"/out3final/"+name,res*255)
 
         os.makedirs(save_path+"/out3out2final", exist_ok=True)
-        res = F.upsample(P1[1] + P1[-1] + P2, size=gt.shape, mode='bilinear', align_corners=False)
+        res = F.upsample(P1[2] + P1[3] + P2, size=gt.shape, mode='bilinear', align_corners=False)
         res = res.sigmoid().data.cpu().numpy().squeeze()
         res = (res - res.min()) / (res.max() - res.min() + 1e-8)
         print('> {} - {}'.format(_data_name, name))
