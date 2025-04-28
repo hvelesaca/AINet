@@ -204,7 +204,8 @@ def train(train_loader, model, optimizer, epoch, test_path):
                 print("Resize")
                 images = F.upsample(images, size=(trainsize, trainsize), mode='bilinear', align_corners=True)
                 gts = F.upsample(gts, size=(trainsize, trainsize), mode='bilinear', align_corners=True)
-                edge = F.upsample(edge, size=(trainsize, trainsize), mode='bilinear', align_corners=True)
+                
+            edge = F.upsample(edge, size=(trainsize, trainsize), mode='bilinear', align_corners=True)
 
             # ---- forward ----
             #print('this is trainsize',trainsize)
