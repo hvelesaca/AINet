@@ -171,7 +171,7 @@ def val(model, epoch, save_path, writer):
         
         writer.add_scalar('MAE', torch.tensor(mae), global_step=epoch)
         print('Epoch: {}, MAE: {}, bestMAE: {}, bestEpoch: {}.'.format(epoch, mae, best_mae, best_epoch))
-        print('Epoch: {}, DICE: {}, bestMAE: {}, bestEpoch: {}.'.format(epoch, dice, best_dice, best_epoch))
+        print('Epoch: {}, DICE: {}, bestDICE: {}, bestEpoch: {}.'.format(epoch, dice, best_dice, best_epoch))
         if epoch == 1:
             best_mae = mae
         else:
