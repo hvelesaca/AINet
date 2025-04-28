@@ -128,7 +128,7 @@ def val(model, epoch, save_path, writer):
     """
     validation function
     """
-    global best_mae, best_epoch
+    global best_mae, best_dice, best_epoch
     model.eval()
     with torch.no_grad():
         mae_sum = 0
@@ -150,10 +150,14 @@ def val(model, epoch, save_path, writer):
             res = res.sigmoid().data.cpu().numpy().squeeze()
             res = (res - res.min()) / (res.max() - res.min() + 1e-8)
             mae_sum += np.sum(np.abs(res - gt)) * 1.0 / (gt.shape[0] * gt.shape[1])
+            dice_sum += (2 * (res * gt).sum()) / ((res + gt).sum() + 1e-8)
 
         mae = mae_sum / test_loader.size
+        dice = dice_sum / test_loader.size
+        
         writer.add_scalar('MAE', torch.tensor(mae), global_step=epoch)
         print('Epoch: {}, MAE: {}, bestMAE: {}, bestEpoch: {}.'.format(epoch, mae, best_mae, best_epoch))
+        print('Epoch: {}, DICE: {}, bestMAE: {}, bestEpoch: {}.'.format(epoch, dice, best_dice, best_epoch))
         if epoch == 1:
             best_mae = mae
         else:
@@ -193,11 +197,13 @@ def train(train_loader, model, optimizer, epoch, test_path):
             gamma = 0.25
             #print('iteration num',len(P1))
             for it in range(len(P1)):
-                loss_P1 += (gamma * it) * losses[it]
+                loss_P1 += (gamma * (it+1)) * losses[it]
 
             loss_P2 = structure_loss(P2, gts)
 
-            loss = loss_P1 + loss_P2
+            #loss = loss_P1 + loss_P2
+            loss = 0.7 * loss_P1 + 0.3 * loss_P2
+
             # ---- backward ----
             loss.backward()
             clip_gradient(optimizer, opt.clip)
@@ -283,18 +289,19 @@ if __name__ == '__main__':
 
     print("#" * 20, "Start Training", "#" * 20)
     best_mae = 1
+    best_dice = 1
     best_epoch = 0
-    cosine_schedule = optim.lr_scheduler.CosineAnnealingLR(optimizer=optimizer, T_max=20, eta_min=1e-5)
+    cosine_schedule = optim.lr_scheduler.CosineAnnealingLR(optimizer=optimizer, T_max=opt.epoch, eta_min=1e-6)
 
     for epoch in range(1, opt.epoch):
          # schedule
-        cosine_schedule.step()
         writer.add_scalar('learning_rate', cosine_schedule.get_lr()[0], global_step=epoch)
         logging.info('>>> current lr: {}'.format(cosine_schedule.get_lr()[0]))
-        #adjust_lr(optimizer, opt.lr, epoch, opt.decay_rate, opt.decay_epoch) 
         
         # train
         train(train_loader, model, optimizer, epoch, opt.save_path)
+        cosine_schedule.step()
+
         if epoch % opt.epoch_save==0:
             # validation
             val(model, epoch, opt.save_path, writer)
