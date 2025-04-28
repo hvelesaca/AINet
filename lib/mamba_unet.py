@@ -288,6 +288,8 @@ class CamouflageDetectionNet(nn.Module):
 
         self.final_decoder = UMambaConvBlock(features[0], features[0])
 
+        self.edge_head = nn.Conv2d(features[0], 1, kernel_size=3, padding=1)  # Supongamos 64 canales antes de salida
+
         self.seg_heads = nn.ModuleList([
             nn.Conv2d(features[2], 1, kernel_size=1),
             nn.Conv2d(features[1], 1, kernel_size=1),
