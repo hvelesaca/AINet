@@ -138,7 +138,7 @@ def val(model, epoch, save_path, writer):
                                    testsize=opt.trainsize)
 
         for i in range(test_loader.size):
-            image, gt, name = test_loader.load_data()
+            image, gt, edge, name = test_loader.load_data()
             gt = np.asarray(gt, np.float32)
             gt /= (gt.max() + 1e-8)
             image = image.cuda()
@@ -181,14 +181,16 @@ def train(train_loader, model, optimizer, epoch, test_path):
             optimizer.zero_grad()
             # print('this is i',i)
             # ---- data prepare ----
-            images, gts = pack
+            images, gts, edge = pack
             images = Variable(images).cuda()
             gts = Variable(gts).cuda()
+            edge = Variable(edge).cuda()
             # ---- rescale ----
             trainsize = int(round(opt.trainsize * rate / 32) * 32)
             if rate != 1:
                 images = F.upsample(images, size=(trainsize, trainsize), mode='bilinear', align_corners=True)
                 gts = F.upsample(gts, size=(trainsize, trainsize), mode='bilinear', align_corners=True)
+                edge = F.upsample(edge, size=(trainsize, trainsize), mode='bilinear', align_corners=True)
             # ---- forward ----
             #print('this is trainsize',trainsize)
             P1, P2 = model(images)
