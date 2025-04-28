@@ -220,7 +220,7 @@ def train(train_loader, model, optimizer, epoch, test_path):
             loss_P2 = structure_loss(P2, gts)
 
             #loss = loss_P1 + loss_P2
-            loss = 0.7 * loss_P1 + 0.3 * loss_P2 + 0.5 * loss_Edge
+            loss = loss_P1 + loss_P2 + loss_Edge
 
             # ---- backward ----
             loss.backward()
