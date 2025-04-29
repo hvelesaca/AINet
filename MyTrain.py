@@ -111,26 +111,12 @@ def structure_loss2(pred, mask):
     lovasz = lovasz_hinge(pred, mask)
 
     return (wbce + wiou).mean() + lovasz
-
-def dice_loss(predict, target):
-    smooth = 1
-    p = 2
-    valid_mask = torch.ones_like(target)
-    predict = predict.contiguous().view(predict.shape[0], -1)
-    target = target.contiguous().view(target.shape[0], -1)
-    valid_mask = valid_mask.contiguous().view(valid_mask.shape[0], -1)
-    num = torch.sum(torch.mul(predict, target) * valid_mask, dim=1) * 2 + smooth
-    den = torch.sum((predict.pow(p) + target.pow(p)) * valid_mask, dim=1) + smooth
-    loss = 1 - num / den
-    return loss.mean()
     
 def structure_loss(pred, mask):
-    # Weighted BCE
     weit = 1 + 5 * torch.abs(F.avg_pool2d(mask, kernel_size=31, stride=1, padding=15) - mask)
     wbce = F.binary_cross_entropy_with_logits(pred, mask, reduction='none')
     wbce = (weit * wbce).sum(dim=(2, 3)) / weit.sum(dim=(2, 3))
 
-    # Weighted IoU
     pred = torch.sigmoid(pred)
     inter = ((pred * mask) * weit).sum(dim=(2, 3))
     union = ((pred + mask) * weit).sum(dim=(2, 3))
@@ -138,78 +124,37 @@ def structure_loss(pred, mask):
 
     return (wbce + wiou).mean()
 
-def structure_loss_dice(pred, mask):
-    return structure_loss(pred, mask) + dice_loss(pred, mask)
-    
-def hybrid_e_loss(pred, mask):
-    """
-        SciChina-Hybrid Eloss-2020
-    :param pred:
-    :param mask:
-    :return:
-    """
-    # adaptive weighting masks
-    weit = 1 + 5 * torch.abs(F.avg_pool2d(mask, kernel_size=31, stride=1, padding=15) - mask)
-
-    # weighted binary cross entropy loss function
-    wbce = F.binary_cross_entropy_with_logits(pred, mask, reduce='none')
-    wbce = ((weit * wbce).sum(dim=(2, 3)) + 1e-8) / (weit.sum(dim=(2, 3)) + 1e-8)
-
-    # weighted e loss function
-    pred = torch.sigmoid(pred)
-    mpred = pred.mean(dim=(2, 3)).view(pred.shape[0], pred.shape[1], 1, 1).repeat(1, 1, pred.shape[2], pred.shape[3])
-    phiFM = pred - mpred
-
-    mmask = mask.mean(dim=(2, 3)).view(mask.shape[0], mask.shape[1], 1, 1).repeat(1, 1, mask.shape[2], mask.shape[3])
-    phiGT = mask - mmask
-
-    EFM = (2.0 * phiFM * phiGT + 1e-8) / (phiFM * phiFM + phiGT * phiGT + 1e-8)
-    QFM = (1 + EFM) * (1 + EFM) / 4.0
-    eloss = 1.0 - QFM.mean(dim=(2, 3))
-
-    # weighted iou loss function
-    inter = ((pred * mask) * weit).sum(dim=(2, 3))
-    union = ((pred + mask) * weit).sum(dim=(2, 3))
-    wiou = 1.0 - (inter + 1 + 1e-8) / (union - inter + 1 + 1e-8)
-
-    return (wbce + eloss + wiou).mean()
-
 def val(model, epoch, save_path, writer):
     """
     validation function
     """
-    global best_mae, best_dice, best_epoch
+    global best_mae, best_epoch
     model.eval()
     with torch.no_grad():
         mae_sum = 0
-        dice_sum =0
         test_loader = test_dataset(image_root=opt.test_path + '/Imgs/',
                                    gt_root=opt.test_path + '/GT/',
-                                   edge_root=opt.test_path + '/Edge/',
                                    testsize=opt.trainsize)
 
         for i in range(test_loader.size):
-            image, gt, edge, name = test_loader.load_data()
+            image, gt, name = test_loader.load_data()
             gt = np.asarray(gt, np.float32)
             gt /= (gt.max() + 1e-8)
             image = image.cuda()
 
-            res_edge, res, res1 = model(image)
-            combined_res = res[2] + res[3] + res1 
+            res, res1 = model(image)
+            combined_res = res[1] + res[-1] + res1 
 
             # eval Dice
             res = F.interpolate(combined_res, size=gt.shape[-2:], mode='bilinear', align_corners=False) # Usar gt.shape[-2:] para obtener H, W
+            #res = F.upsample(combined_res, size=gt.shape, mode='bilinear', align_corners=False)
             res = res.sigmoid().data.cpu().numpy().squeeze()
             res = (res - res.min()) / (res.max() - res.min() + 1e-8)
             mae_sum += np.sum(np.abs(res - gt)) * 1.0 / (gt.shape[0] * gt.shape[1])
-            dice_sum += (2 * (res * gt).sum()) / ((res + gt).sum() + 1e-8)
 
         mae = mae_sum / test_loader.size
-        dice = dice_sum / test_loader.size
-        
         writer.add_scalar('MAE', torch.tensor(mae), global_step=epoch)
         print('Epoch: {}, MAE: {}, bestMAE: {}, bestEpoch: {}.'.format(epoch, mae, best_mae, best_epoch))
-        print('Epoch: {}, DICE: {}, bestDICE: {}, bestEpoch: {}.'.format(epoch, dice, best_dice, best_epoch))
         if epoch == 1:
             best_mae = mae
         else:
@@ -226,42 +171,34 @@ def train(train_loader, model, optimizer, epoch, test_path):
     size_rates = [1]
     loss_P1_record = AvgMeter()
     loss_P2_record = AvgMeter()
-    loss_Edge_record = AvgMeter()
         
     for i, pack in enumerate(train_loader, start=1):
         for rate in size_rates:
             optimizer.zero_grad()
             # print('this is i',i)
             # ---- data prepare ----
-            images, gts, edge = pack
+            images, gts = pack
             images = Variable(images).cuda()
             gts = Variable(gts).cuda()
-            edge = Variable(edge).cuda()
             # ---- rescale ----
             trainsize = int(round(opt.trainsize * rate / 32) * 32)
             if rate != 1:
-                print("Resize")
                 images = F.upsample(images, size=(trainsize, trainsize), mode='bilinear', align_corners=True)
                 gts = F.upsample(gts, size=(trainsize, trainsize), mode='bilinear', align_corners=True)
-                edge = F.upsample(edge, size=(trainsize, trainsize), mode='bilinear', align_corners=True)
-
             # ---- forward ----
             #print('this is trainsize',trainsize)
-            P_edge, P1, P2 = model(images)
-            #Edge loss function
-            loss_Edge = dice_loss(P_edge, edge)
+            P1, P2 = model(images)
             # ---- loss function ----
             losses = [structure_loss(out, gts) for out in P1]
             loss_P1 = 0
             gamma = 0.25
             #print('iteration num',len(P1))
             for it in range(len(P1)):
-                loss_P1 += (gamma * (it)) * losses[it]
+                loss_P1 += (gamma * it) * losses[it]
 
             loss_P2 = structure_loss(P2, gts)
 
             loss = loss_P1 + loss_P2
-
             # ---- backward ----
             loss.backward()
             clip_gradient(optimizer, opt.clip)
@@ -270,12 +207,11 @@ def train(train_loader, model, optimizer, epoch, test_path):
             if rate == 1:
                 loss_P1_record.update(loss_P1.data, opt.batchsize)
                 loss_P2_record.update(loss_P2.data, opt.batchsize)
-                loss_Edge_record.update(loss_Edge.data, opt.batchsize)
                 
         # ---- train visualization ----
         if i % 20 == 0 or i == total_step:
-            print('{} Epoch [{:03d}/{:03d}], Step [{:04d}/{:04d}], Loss P1: [{:0.4f}], Loss P2: [{:0.4f}], Loss Edge: [{:0.4f}]'.format(datetime.now(), epoch, opt.epoch, i, total_step,loss_P1_record.show(), loss_P2_record.show(), loss_Edge_record.show()))
-            logging.info('{} Epoch [{:03d}/{:03d}], Step [{:04d}/{:04d}], Loss P1: [{:0.4f}], Loss P2: [{:0.4f}], Loss Edge: [{:0.4f}]'.format(datetime.now(), epoch, opt.epoch, i, total_step,loss_P1_record.show(), loss_P2_record.show(), loss_Edge_record.show()))
+            print('{} Epoch [{:03d}/{:03d}], Step [{:04d}/{:04d}], Loss P1: [{:0.4f}], Loss P2: [{:0.4f}]'.format(datetime.now(), epoch, opt.epoch, i, total_step,loss_P1_record.show(), loss_P2_record.show()))
+            logging.info('{} Epoch [{:03d}/{:03d}], Step [{:04d}/{:04d}], Loss P1: [{:0.4f}], Loss P2: [{:0.4f}]'.format(datetime.now(), epoch, opt.epoch, i, total_step,loss_P1_record.show(), loss_P2_record.show()))
     # save model
     save_path = opt.save_path
     if epoch % opt.epoch_save == 0:
@@ -289,7 +225,7 @@ if __name__ == '__main__':
 
     ###############################################
     parser = argparse.ArgumentParser()
-    parser.add_argument('--epoch', type=int,default=151, help='epoch number')
+    parser.add_argument('--epoch', type=int,default=1001, help='epoch number')
     parser.add_argument('--lr', type=float,default=1e-4, help='learning rate')
     parser.add_argument('--optimizer', type=str,default='AdamW', help='choosing optimizer AdamW or SGD')
     parser.add_argument('--augmentation',default=True, help='choose to do random flip rotation')
@@ -337,32 +273,29 @@ if __name__ == '__main__':
     #print(optimizer)
     image_root = '{}/Imgs/'.format(opt.train_path)
     gt_root = '{}/GT/'.format(opt.train_path)
-    edge_root = '{}/Edge/'.format(opt.train_path)
 
     print("image_root: ", image_root)
     print("gt_root: ", gt_root)
-    print("edge_root: ", edge_root)
 
-    train_loader = get_loader(image_root, gt_root, edge_root, batchsize=opt.batchsize, trainsize=opt.trainsize, augmentation=opt.augmentation)
+    train_loader = get_loader(image_root, gt_root, batchsize=opt.batchsize, trainsize=opt.trainsize, augmentation=opt.augmentation)
     total_step = len(train_loader)
 
     writer = SummaryWriter(opt.save_path + 'summary')
 
     print("#" * 20, "Start Training", "#" * 20)
     best_mae = 1
-    best_dice = 1
     best_epoch = 0
-    cosine_schedule = optim.lr_scheduler.CosineAnnealingLR(optimizer=optimizer, T_max=opt.epoch, eta_min=1e-6)
+    cosine_schedule = optim.lr_scheduler.CosineAnnealingLR(optimizer=optimizer, T_max=20, eta_min=1e-5)
 
     for epoch in range(1, opt.epoch):
          # schedule
+        cosine_schedule.step()
         writer.add_scalar('learning_rate', cosine_schedule.get_lr()[0], global_step=epoch)
         logging.info('>>> current lr: {}'.format(cosine_schedule.get_lr()[0]))
+        #adjust_lr(optimizer, opt.lr, epoch, opt.decay_rate, opt.decay_epoch) 
         
         # train
         train(train_loader, model, optimizer, epoch, opt.save_path)
-        cosine_schedule.step()
-
         if epoch % opt.epoch_save==0:
             # validation
             val(model, epoch, opt.save_path, writer)
