@@ -288,14 +288,6 @@ class CamouflageDetectionNet(nn.Module):
 
         self.final_decoder = UMambaConvBlock(features[0], features[0])
 
-        #self.edge_head = nn.Conv2d(features[0], 1, kernel_size=3, padding=1)  # Supongamos 64 canales antes de salida
-        self.edge_head = nn.Sequential(
-            nn.Conv2d(features[0], features[0] // 2, kernel_size=3, padding=1, bias=False),
-            nn.BatchNorm2d(features[0] // 2),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(features[0] // 2, 1, kernel_size=1) # Conv 1x1 final para salida
-        )
-
         self.seg_heads = nn.ModuleList([
             nn.Conv2d(features[2], 1, kernel_size=1),
             nn.Conv2d(features[1], 1, kernel_size=1),
@@ -322,10 +314,8 @@ class CamouflageDetectionNet(nn.Module):
         out0 = F.interpolate(self.seg_heads[3](d0), size=x.shape[2:], mode='bilinear', align_corners=False)
 
         final_out = (out0 + out1 + out2 + out3) / 4
-        
-        out_edge = F.interpolate(self.edge_head(d0), size=x.shape[2:], mode='bilinear', align_corners=False) # salida de bordes
 
-        return out_edge, [out0, out1, out2, out3], final_out
+        return [out0, out1, out2, out3], final_out
 
     def _load_backbone_weights(self, path: str):
         try:
