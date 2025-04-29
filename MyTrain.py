@@ -138,7 +138,9 @@ def structure_loss(pred, mask):
 
     return (wbce + wiou).mean()
 
-
+def structure_loss_dice(pred, mask):
+    return structure_loss(pred, mask) + dice_loss(pred, mask)
+    
 def hybrid_e_loss(pred, mask):
     """
         SciChina-Hybrid Eloss-2020
@@ -249,14 +251,14 @@ def train(train_loader, model, optimizer, epoch, test_path):
             #Edge loss function
             loss_Edge = dice_loss(P_edge, edge)
             # ---- loss function ----
-            losses = [hybrid_e_loss(out, gts) for out in P1]
+            losses = [structure_loss_dice(out, gts) for out in P1]
             loss_P1 = 0
             gamma = 0.25
             #print('iteration num',len(P1))
             for it in range(len(P1)):
                 loss_P1 += (gamma * (it)) * losses[it]
 
-            loss_P2 = hybrid_e_loss(P2, gts)
+            loss_P2 = structure_loss_dice(P2, gts)
 
             loss = loss_P1 + loss_P2
 
