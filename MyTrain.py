@@ -225,7 +225,7 @@ if __name__ == '__main__':
 
     ###############################################
     parser = argparse.ArgumentParser()
-    parser.add_argument('--epoch', type=int,default=1001, help='epoch number')
+    parser.add_argument('--epoch', type=int,default=101, help='epoch number')
     parser.add_argument('--lr', type=float,default=1e-4, help='learning rate')
     parser.add_argument('--optimizer', type=str,default='AdamW', help='choosing optimizer AdamW or SGD')
     parser.add_argument('--augmentation',default=True, help='choose to do random flip rotation')
@@ -292,7 +292,6 @@ if __name__ == '__main__':
         cosine_schedule.step()
         writer.add_scalar('learning_rate', cosine_schedule.get_lr()[0], global_step=epoch)
         logging.info('>>> current lr: {}'.format(cosine_schedule.get_lr()[0]))
-        #adjust_lr(optimizer, opt.lr, epoch, opt.decay_rate, opt.decay_epoch) 
         
         # train
         train(train_loader, model, optimizer, epoch, opt.save_path)
