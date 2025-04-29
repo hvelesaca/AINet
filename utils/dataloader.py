@@ -52,7 +52,7 @@ class CODataset(data.Dataset):
         image = np.array(Image.open(self.images[index]).convert('RGB'))
         gt = np.array(Image.open(self.gts[index]).convert('L'))
         
-        augmented = self.transform(image=image, mask=gt, edge=edge)
+        augmented = self.transform(image=image, mask=gt)
         image = augmented['image']
         gt = augmented['mask'].unsqueeze(0).float() / 255.0
         
@@ -62,7 +62,7 @@ class CODataset(data.Dataset):
         assert len(self.images) == len(self.gts), "Mismatch between images and ground truths"
 
         images, gts = [], []
-        for img_path, gt_path, edge_path in zip(self.images, self.gts, self.edge):
+        for img_path, gt_path in zip(self.images, self.gts):
             img = Image.open(img_path)
             gt = Image.open(gt_path)
             
@@ -115,7 +115,7 @@ class test_dataset:
         # self.index = self.index % self.size
         # return image, gt, name
         self.index += 1
-        return image, gt, edge, name
+        return image, gt, name
 
     def rgb_loader(self, path):
         with open(path, 'rb') as f:
@@ -156,7 +156,7 @@ class My_test_dataset:
         if name.endswith('.jpg'):
             name = name.split('.jpg')[0] + '.png'
         self.index += 1
-        return image, gt, edge, name
+        return image, gt, name
 
     def rgb_loader(self, path):
         with open(path, 'rb') as f:
