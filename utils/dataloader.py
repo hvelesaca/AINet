@@ -66,7 +66,7 @@ class CODataset(data.Dataset):
             img = Image.open(img_path)
             gt = Image.open(gt_path)
             
-            if img.size == gt.size == edg.size:
+            if img.size == gt.size:
                 images.append(img_path)
                 gts.append(gt_path)
             
