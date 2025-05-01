@@ -179,67 +179,6 @@ class UMambaConvBlock(nn.Module):
 
         return x
 
-# Simple Decoder Block with UMamba (No CBAM)
-class SimpleDecoderBlock(nn.Module):
-    def __init__(self, in_channels: int, out_channels: int):
-        super().__init__()
-        self.up = nn.ConvTranspose2d(in_channels, out_channels, kernel_size=2, stride=2)
-        self.umamba_block = UMambaConvBlock(out_channels * 2, out_channels)
-
-    def forward(self, x: torch.Tensor, skip: torch.Tensor) -> torch.Tensor:
-        x = self.up(x)
-        x = torch.cat([x, skip], dim=1)  # concatenar skip connection
-        x = self.umamba_block(x)
-        return x
-
-# Modelo Completo con Deep Supervision y estructura U-Net
-class CamouflageDetectionNetAnt(nn.Module):
-    def __init__(self, features=[64, 128, 256, 512], pretrained=True):
-        super().__init__()
-        self.backbone = pvt_v2_b2()  
-        if pretrained:
-            self._load_backbone_weights('/kaggle/input/pretrained_pvt_v2_b2/pytorch/default/1/pvt_v2_b2.pth')      
-                
-        out_channels = [64, 128, 320, 512] #self.backbone.out_channels 
-
-        self.encoders = nn.ModuleList([
-            UMambaConvBlock(out_channels[i], features[i]) for i in range(4)
-        ])
-
-        self.decoders = nn.ModuleList([
-            SimpleDecoderBlock(features[3], features[2]),
-            SimpleDecoderBlock(features[2], features[1]),
-            SimpleDecoderBlock(features[1], features[0])
-        ])
-
-        self.seg_heads = nn.ModuleList([
-            nn.Conv2d(features[i], 1, kernel_size=1) for i in range(3)
-        ])
-        
-    def forward(self, x: torch.Tensor):
-        skips = self.backbone.forward_features(x)
-        enc_feats = [enc(skip) for enc, skip in zip(self.encoders, skips)]
-
-        d3 = self.decoders[0](enc_feats[3], enc_feats[2])
-        d2 = self.decoders[1](d3, enc_feats[1])
-        d1 = self.decoders[2](d2, enc_feats[0])
-
-        out1 = F.interpolate(self.seg_heads[0](d1), size=x.shape[2:], mode='bilinear', align_corners=False)
-        out2 = F.interpolate(self.seg_heads[1](d2), size=x.shape[2:], mode='bilinear', align_corners=False)
-        out3 = F.interpolate(self.seg_heads[2](d3), size=x.shape[2:], mode='bilinear', align_corners=False)
-
-        final_out = (out1 + out2 + out3) / 3
-        return [out1, out2, out3], final_out
-
-    def _load_backbone_weights(self, path: str):
-        try:
-            state_dict = torch.load(path, map_location='cpu')
-            self.backbone.load_state_dict(state_dict, strict=False)
-            print("✅ Pesos backbone cargados correctamente.")
-        except Exception as e:
-            print(f"❌ Error cargando pesos backbone: {e}")
-
-
 # --- Nuevo bloque para Feature Aggregation ---
 class FeatureAggregation(nn.Module):
     def __init__(self, in_channels, out_channels):
