@@ -192,8 +192,8 @@ class FeatureAggregation(nn.Module):
         x = self.conv3x3(x)
         return x
 
-# --- Decoder Block ---
-class DecoderBlock(nn.Module):
+# --- Decoder Block modificado ---
+class AdvancedDecoderBlock(nn.Module):
     def __init__(self, in_channels, skip_channels, out_channels):
         super().__init__()
         self.upsample = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=False)
@@ -207,57 +207,25 @@ class DecoderBlock(nn.Module):
         x = self.umamba_block(x)
         return x
 
-class Conv_Block(nn.Module):
-    def __init__(self, channels):
-        super(Conv_Block, self).__init__()
-        self.conv1 = nn.Conv2d(channels*3, channels, kernel_size=3, stride=1, padding=1, bias=False)
-        self.bn1 = nn.BatchNorm2d(channels)
-
-        self.conv2 = nn.Conv2d(channels, channels*2, kernel_size=5, stride=1, padding=2, bias=False)
-        self.bn2 = nn.BatchNorm2d(channels*2)
-
-        self.conv3 = nn.Conv2d(channels*2, channels, kernel_size=3, stride=1, padding=1, bias=False)
-        self.bn3 = nn.BatchNorm2d(channels)
-
-    def forward(self, input1, input2, input3):
-        fuse = torch.cat((input1, input2, input3), 1)
-        fuse = self.bn1(self.conv1(fuse))
-        fuse = self.bn2(self.conv2(fuse))
-        fuse = self.bn3(self.conv3(fuse))
-        return fuse
-
-    def initialize(self):
-        weight_init(self)
-
 # --- Modelo Completo ---
 class CamouflageDetectionNet(nn.Module):
-    def __init__(self, features=[64, 128, 320, 512], pretrained=True):
+    def __init__(self, features=[64, 128, 256, 512], pretrained=True):
         super().__init__()
         self.backbone = pvt_v2_b2()
         if pretrained:
             self._load_backbone_weights('/kaggle/input/pretrained_pvt_v2_b2/pytorch/default/1/pvt_v2_b2.pth')
 
         out_channels = [64, 128, 320, 512] 
-        channels=128
-        
+
         self.encoders = nn.ModuleList([
             UMambaConvBlock(out_channels[i], features[i]) for i in range(4)
         ])
 
-        self.decoder3 = DecoderBlock(features[3], features[2], features[2])
-        self.decoder2 = DecoderBlock(features[2], features[1], features[1])
-        self.decoder1 = DecoderBlock(features[1], features[0], features[0])
+        self.decoder3 = AdvancedDecoderBlock(features[3], features[2], features[2])
+        self.decoder2 = AdvancedDecoderBlock(features[2], features[1], features[1])
+        self.decoder1 = AdvancedDecoderBlock(features[1], features[0], features[0])
 
-        self.side_conv1 = nn.Conv2d(512, channels, kernel_size=3, stride=1, padding=1)
-        self.side_conv2 = nn.Conv2d(320, channels, kernel_size=3, stride=1, padding=1)
-        self.side_conv3 = nn.Conv2d(128, channels, kernel_size=3, stride=1, padding=1)
-        self.side_conv4 = nn.Conv2d(64, channels, kernel_size=3, stride=1, padding=1)
-        
-        self.conv_block = Conv_Block(channels)
-
-        self.fuse1 = nn.Sequential(nn.Conv2d(channels*2, channels, kernel_size=3, stride=1, padding=1, bias=False),nn.BatchNorm2d(channels))
-        self.fuse2 = nn.Sequential(nn.Conv2d(channels*2, channels, kernel_size=3, stride=1, padding=1, bias=False),nn.BatchNorm2d(channels))
-        self.fuse3 = nn.Sequential(nn.Conv2d(channels*2, channels, kernel_size=3, stride=1, padding=1, bias=False),nn.BatchNorm2d(channels))
+        #self.final_decoder = UMambaConvBlock(features[0], features[0])
 
         self.seg_heads = nn.ModuleList([
             nn.Conv2d(features[2], 1, kernel_size=1),
@@ -271,47 +239,22 @@ class CamouflageDetectionNet(nn.Module):
         skips = self.backbone.forward_features(x)
         enc_feats = [enc(skip) for enc, skip in zip(self.encoders, skips)]
 
-        enc1 = enc_feats[0]
-        enc2 = enc_feats[1]
-        enc3 = enc_feats[2]
-        enc4 = enc_feats[3]
-
-        enc4, enc3, enc2, enc1 = self.side_conv1(enc4), self.side_conv2(enc3), self.side_conv3(enc2), self.side_conv4(enc1)
-
-        if enc4.size()[2:] != enc3.size()[2:]:
-            enc4 = F.interpolate(enc4, size=enc3.size()[2:], mode='bilinear')
-        if enc2.size()[2:] != enc3.size()[2:]:
-            enc2 = F.interpolate(enc2, size=enc3.size()[2:], mode='bilinear')
-
-        print("size2: ", enc2.shape)
-        print("size3: ", enc3.shape)
-        print("size4: ", enc4.shape)
-        
-        enc5 = self.conv_block(enc2, enc3, enc4)
-
-        enc4 = torch.cat((enc4, enc5),1)
-        enc3 = torch.cat((enc3, enc5),1)
-        enc2 = torch.cat((enc2, enc5),1)
-        
-        enc4 = F.relu(self.fuse1(enc4), inplace=True)
-        enc3 = F.relu(self.fuse2(enc3), inplace=True)
-        enc2 = F.relu(self.fuse3(enc2), inplace=True)
-        
         # Decoder path
-        d4 = self.decoder3(enc5, [enc4])
-        d3 = self.decoder2(d4, [enc3])
-        d2 = self.decoder1(d3, [enc2])
-        d1 = torch.cat((d2, enc1),1)
+        d3 = self.decoder3(enc_feats[3], [enc_feats[2]])
+        d2 = self.decoder2(d3, [enc_feats[1]])
+        d1 = self.decoder1(d2, [enc_feats[0]])
+
+        #d0 = self.final_decoder(d1)
 
         # Deep supervision
-        out4 = F.interpolate(self.seg_heads[0](d4), size=x.shape[2:], mode='bilinear', align_corners=False)
-        out3 = F.interpolate(self.seg_heads[1](d3), size=x.shape[2:], mode='bilinear', align_corners=False)
-        out2 = F.interpolate(self.seg_heads[2](d2), size=x.shape[2:], mode='bilinear', align_corners=False)
-        out1 = F.interpolate(self.seg_heads[3](d1), size=x.shape[2:], mode='bilinear', align_corners=False)
+        out3 = F.interpolate(self.seg_heads[0](d3), size=x.shape[2:], mode='bilinear', align_corners=False)
+        out2 = F.interpolate(self.seg_heads[1](d2), size=x.shape[2:], mode='bilinear', align_corners=False)
+        out1 = F.interpolate(self.seg_heads[2](d1), size=x.shape[2:], mode='bilinear', align_corners=False)
+        #out0 = F.interpolate(self.seg_heads[3](d0), size=x.shape[2:], mode='bilinear', align_corners=False)
 
-        final_out = (out1 + out2 + out3 + out4) / 4
+        final_out = (out1 + out2 + out3) / 3
 
-        return [out1, out2, out3, out4], final_out
+        return [out1, out2, out3], final_out
 
     def _load_backbone_weights(self, path: str):
         try:
