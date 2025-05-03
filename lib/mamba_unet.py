@@ -270,6 +270,12 @@ class CamouflageDetectionNet(nn.Module):
         enc2 = enc_feats[1]
         enc3 = enc_feats[2]
         enc4 = enc_feats[3]
+
+        if enc4.size()[2:] != enc3.size()[2:]:
+            enc4 = F.interpolate(enc4, size=enc3.size()[2:], mode='bilinear')
+        if E2.size()[2:] != enc3.size()[2:]:
+            enc2 = F.interpolate(enc2, size=enc3.size()[2:], mode='bilinear')
+        
         enc5 = self.conv_block(enc2, enc3, enc4)
 
         enc4 = torch.cat((enc4, enc5),1)
@@ -284,7 +290,7 @@ class CamouflageDetectionNet(nn.Module):
         d4 = self.decoder3(enc5, [enc4])
         d3 = self.decoder2(d4, [enc3])
         d2 = self.decoder1(d3, [enc2])
-        d1 = torch.cat((dec2, enc1),1)
+        d1 = torch.cat((d2, enc1),1)
 
         # Deep supervision
         out4 = F.interpolate(self.seg_heads[0](d4), size=x.shape[2:], mode='bilinear', align_corners=False)
@@ -292,7 +298,7 @@ class CamouflageDetectionNet(nn.Module):
         out2 = F.interpolate(self.seg_heads[2](d2), size=x.shape[2:], mode='bilinear', align_corners=False)
         out1 = F.interpolate(self.seg_heads[3](d1), size=x.shape[2:], mode='bilinear', align_corners=False)
 
-        final_out = (out1 + out2 + out3 + out4) / 3
+        final_out = (out1 + out2 + out3 + out4) / 4
 
         return [out1, out2, out3, out4], final_out
 
