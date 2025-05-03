@@ -248,6 +248,11 @@ class CamouflageDetectionNet(nn.Module):
         self.decoder2 = DecoderBlock(features[2], features[1], features[1])
         self.decoder1 = DecoderBlock(features[1], features[0], features[0])
 
+        self.side_conv1 = nn.Conv2d(512, channels, kernel_size=3, stride=1, padding=1)
+        self.side_conv2 = nn.Conv2d(320, channels, kernel_size=3, stride=1, padding=1)
+        self.side_conv3 = nn.Conv2d(128, channels, kernel_size=3, stride=1, padding=1)
+        self.side_conv4 = nn.Conv2d(64, channels, kernel_size=3, stride=1, padding=1)
+        
         self.conv_block = Conv_Block(channels)
 
         self.fuse1 = nn.Sequential(nn.Conv2d(channels*2, channels, kernel_size=3, stride=1, padding=1, bias=False),nn.BatchNorm2d(channels))
@@ -270,6 +275,8 @@ class CamouflageDetectionNet(nn.Module):
         enc2 = enc_feats[1]
         enc3 = enc_feats[2]
         enc4 = enc_feats[3]
+
+        enc4, enc3, enc2, enc1 = self.side_conv1(enc4), self.side_conv2(enc3), self.side_conv3(enc2), self.side_conv4(enc1)
 
         if enc4.size()[2:] != enc3.size()[2:]:
             enc4 = F.interpolate(enc4, size=enc3.size()[2:], mode='bilinear')
