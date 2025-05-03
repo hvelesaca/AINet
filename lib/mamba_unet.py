@@ -266,10 +266,10 @@ class CamouflageDetectionNet(nn.Module):
         skips = self.backbone.forward_features(x)
         enc_feats = [enc(skip) for enc, skip in zip(self.encoders, skips)]
 
-        enc1 = [enc_feats[0]]
-        enc2 = [enc_feats[1]]
-        enc3 = [enc_feats[2]]
-        enc4 = [enc_feats[3]]
+        enc1 = enc_feats[0]
+        enc2 = enc_feats[1]
+        enc3 = enc_feats[2]
+        enc4 = enc_feats[3]
         enc5 = self.conv_block(enc2, enc3, enc4)
 
         enc4 = torch.cat((enc4, enc5),1)
