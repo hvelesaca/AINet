@@ -273,7 +273,7 @@ class CamouflageDetectionNet(nn.Module):
 
         if enc4.size()[2:] != enc3.size()[2:]:
             enc4 = F.interpolate(enc4, size=enc3.size()[2:], mode='bilinear')
-        if E2.size()[2:] != enc3.size()[2:]:
+        if enc2.size()[2:] != enc3.size()[2:]:
             enc2 = F.interpolate(enc2, size=enc3.size()[2:], mode='bilinear')
         
         enc5 = self.conv_block(enc2, enc3, enc4)
