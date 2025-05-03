@@ -281,9 +281,9 @@ class CamouflageDetectionNet(nn.Module):
         enc2 = F.relu(self.fuse3(enc2), inplace=True)
         
         # Decoder path
-        d4 = self.decoder3(enc5, enc4)
-        d3 = self.decoder2(d4, enc3)
-        d2 = self.decoder1(d3, enc2)
+        d4 = self.decoder3(enc5, [enc4])
+        d3 = self.decoder2(d4, [enc3])
+        d2 = self.decoder1(d3, [enc2])
         d1 = torch.cat((dec2, enc1),1)
 
         # Deep supervision
