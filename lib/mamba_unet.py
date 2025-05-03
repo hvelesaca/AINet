@@ -5,21 +5,23 @@ from mamba_ssm import Mamba
 from huggingface_hub import hf_hub_download
 import timm
 from lib.pvtv2 import pvt_v2_b2
+from timm.models.layers import DropPath
 
 # Residual Block (Conv + InstanceNorm + LeakyReLU + Residual)
 class ResidualBlock(nn.Module):
-    def __init__(self, channels):
+    def __init__(self, channels, drop_path=0.1):
         super().__init__()
         self.conv = nn.Conv2d(channels, channels, kernel_size=3, padding=1, bias=False)
         self.norm = nn.InstanceNorm2d(channels)
         self.act = nn.LeakyReLU(0.2, inplace=True)
+        self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
 
     def forward(self, x):
         residual = x
         x = self.conv(x)
         x = self.norm(x)
         x = self.act(x)
-        return x + residual
+        return residual + self.drop_path(x)
     
 #https://github.com/Jongchan/attention-module/blob/c06383c514ab0032d044cc6fcd8c8207ea222ea7/MODELS/cbam.py
 class BasicConv(nn.Module):
@@ -207,7 +209,46 @@ class AdvancedDecoderBlock(nn.Module):
         x = self.umamba_block(x)
         return x
 
-# --- Modelo Completo ---
+class UNetPlusPlusDecoder(nn.Module):
+    def __init__(self, features):
+        super().__init__()
+        # Definimos los bloques del decoder en forma anidada
+        self.up_3_0 = AdvancedDecoderBlock(features[3], features[2], features[2])
+        self.up_2_0 = AdvancedDecoderBlock(features[2], features[1], features[1])
+        self.up_1_0 = AdvancedDecoderBlock(features[1], features[0], features[0])
+
+        self.up_2_1 = AdvancedDecoderBlock(features[2], features[1]*2, features[1])
+        self.up_1_1 = AdvancedDecoderBlock(features[1], features[0]*2, features[0])
+
+        self.up_1_2 = AdvancedDecoderBlock(features[1], features[0]*3, features[0])
+
+        # Cabezas de segmentación para supervisión profunda
+        self.seg_heads = nn.ModuleList([
+            nn.Conv2d(features[2], 1, kernel_size=1),
+            nn.Conv2d(features[1], 1, kernel_size=1),
+            nn.Conv2d(features[0], 1, kernel_size=1),
+        ])
+
+    def forward(self, enc_feats):
+        x0_0, x1_0, x2_0, x3_0 = enc_feats
+
+        x2_1 = self.up_3_0(x3_0, [x2_0])
+        x1_1 = self.up_2_0(x2_0, [x1_0])
+        x0_1 = self.up_1_0(x1_0, [x0_0])
+
+        x1_2 = self.up_2_1(x2_1, [x1_0, x1_1])
+        x0_2 = self.up_1_1(x1_1, [x0_0, x0_1])
+
+        x0_3 = self.up_1_2(x1_2, [x0_0, x0_1, x0_2])
+
+        # Deep supervision outputs
+        out3 = self.seg_heads[0](x2_1)
+        out2 = self.seg_heads[1](x1_2)
+        out1 = self.seg_heads[2](x0_3)
+
+        return out1, out2, out3
+
+# Modelo completo adaptado a U-Net++
 class CamouflageDetectionNet(nn.Module):
     def __init__(self, features=[64, 128, 256, 512], pretrained=True):
         super().__init__()
@@ -215,42 +256,24 @@ class CamouflageDetectionNet(nn.Module):
         if pretrained:
             self._load_backbone_weights('/kaggle/input/pretrained_pvt_v2_b2/pytorch/default/1/pvt_v2_b2.pth')
 
-        out_channels = [64, 128, 320, 512] 
+        out_channels = [64, 128, 320, 512]
 
         self.encoders = nn.ModuleList([
             UMambaConvBlock(out_channels[i], features[i]) for i in range(4)
         ])
 
-        self.decoder3 = AdvancedDecoderBlock(features[3], features[2], features[2])
-        self.decoder2 = AdvancedDecoderBlock(features[2], features[1], features[1])
-        self.decoder1 = AdvancedDecoderBlock(features[1], features[0], features[0])
-
-        #self.final_decoder = UMambaConvBlock(features[0], features[0])
-
-        self.seg_heads = nn.ModuleList([
-            nn.Conv2d(features[2], 1, kernel_size=1),
-            nn.Conv2d(features[1], 1, kernel_size=1),
-            nn.Conv2d(features[0], 1, kernel_size=1),
-            nn.Conv2d(features[0], 1, kernel_size=1),
-        ])
+        self.decoder = UNetPlusPlusDecoder(features)
 
     def forward(self, x: torch.Tensor):
-        # Backbone features
         skips = self.backbone.forward_features(x)
         enc_feats = [enc(skip) for enc, skip in zip(self.encoders, skips)]
 
-        # Decoder path
-        d3 = self.decoder3(enc_feats[3], [enc_feats[2]])
-        d2 = self.decoder2(d3, [enc_feats[1]])
-        d1 = self.decoder1(d2, [enc_feats[0]])
+        out1, out2, out3 = self.decoder(enc_feats)
 
-        #d0 = self.final_decoder(d1)
-
-        # Deep supervision
-        out3 = F.interpolate(self.seg_heads[0](d3), size=x.shape[2:], mode='bilinear', align_corners=False)
-        out2 = F.interpolate(self.seg_heads[1](d2), size=x.shape[2:], mode='bilinear', align_corners=False)
-        out1 = F.interpolate(self.seg_heads[2](d1), size=x.shape[2:], mode='bilinear', align_corners=False)
-        #out0 = F.interpolate(self.seg_heads[3](d0), size=x.shape[2:], mode='bilinear', align_corners=False)
+        # Interpolación a tamaño original
+        out1 = F.interpolate(out1, size=x.shape[2:], mode='bilinear', align_corners=False)
+        out2 = F.interpolate(out2, size=x.shape[2:], mode='bilinear', align_corners=False)
+        out3 = F.interpolate(out3, size=x.shape[2:], mode='bilinear', align_corners=False)
 
         final_out = (out1 + out2 + out3) / 3
 
@@ -264,11 +287,10 @@ class CamouflageDetectionNet(nn.Module):
         except Exception as e:
             print(f"❌ Error cargando pesos backbone: {e}")
 
-
 # Ejemplo de uso optimizado
 if __name__ == "__main__":
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model = CamouflageDetectionNet(pretrained=True).to(device)
+    model = CamouflageDetectionNetUNetPP(pretrained=True).to(device)
     model.eval()
     with torch.no_grad():
         x = torch.randn(1, 3, 256, 256).to(device)
