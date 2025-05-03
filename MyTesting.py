@@ -41,8 +41,29 @@ for _data_name in [opt.test_path]:
 
         P1, P2 = model(image)
 
-        os.makedirs(save_path+"/aivgnet", exist_ok=True)
+        os.makedirs(save_path+"/aivgnet012", exist_ok=True)
         res = F.upsample(P1[0] + P1[1] + P1[2] + P2, size=gt.shape, mode='bilinear', align_corners=False)
+        res = res.sigmoid().data.cpu().numpy().squeeze()
+        res = (res - res.min()) / (res.max() - res.min() + 1e-8)
+        print('> {} - {}'.format(_data_name, name))
+        cv2.imwrite(save_path+"/aivgnet012/"+name,res*255)
+
+        os.makedirs(save_path+"/aivgnet12", exist_ok=True)
+        res = F.upsample(P1[1] + P1[2] + P2, size=gt.shape, mode='bilinear', align_corners=False)
+        res = res.sigmoid().data.cpu().numpy().squeeze()
+        res = (res - res.min()) / (res.max() - res.min() + 1e-8)
+        print('> {} - {}'.format(_data_name, name))
+        cv2.imwrite(save_path+"/aivgnet12/"+name,res*255)
+
+        os.makedirs(save_path+"/aivgnet2", exist_ok=True)
+        res = F.upsample(P1[2] + P2, size=gt.shape, mode='bilinear', align_corners=False)
+        res = res.sigmoid().data.cpu().numpy().squeeze()
+        res = (res - res.min()) / (res.max() - res.min() + 1e-8)
+        print('> {} - {}'.format(_data_name, name))
+        cv2.imwrite(save_path+"/aivgnet2/"+name,res*255)
+
+        os.makedirs(save_path+"/aivgnet", exist_ok=True)
+        res = F.upsample(P2, size=gt.shape, mode='bilinear', align_corners=False)
         res = res.sigmoid().data.cpu().numpy().squeeze()
         res = (res - res.min()) / (res.max() - res.min() + 1e-8)
         print('> {} - {}'.format(_data_name, name))
