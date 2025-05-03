@@ -209,71 +209,50 @@ class AdvancedDecoderBlock(nn.Module):
         x = self.umamba_block(x)
         return x
 
-class UNetPlusPlusDecoder(nn.Module):
-    def __init__(self, features):
-        super().__init__()
-        # Definimos los bloques del decoder en forma anidada
-        self.up_3_0 = AdvancedDecoderBlock(features[3], features[2], features[2])
-        self.up_2_0 = AdvancedDecoderBlock(features[2], features[1], features[1])
-        self.up_1_0 = AdvancedDecoderBlock(features[1], features[0], features[0])
-
-        self.up_2_1 = AdvancedDecoderBlock(features[2], features[1]*2, features[1])
-        self.up_1_1 = AdvancedDecoderBlock(features[1], features[0]*2, features[0])
-
-        self.up_1_2 = AdvancedDecoderBlock(features[1], features[0]*3, features[0])
-
-        # Cabezas de segmentación para supervisión profunda
-        self.seg_heads = nn.ModuleList([
-            nn.Conv2d(features[2], 1, kernel_size=1),
-            nn.Conv2d(features[1], 1, kernel_size=1),
-            nn.Conv2d(features[0], 1, kernel_size=1),
-        ])
-
-    def forward(self, enc_feats):
-        x0_0, x1_0, x2_0, x3_0 = enc_feats
-
-        x2_1 = self.up_3_0(x3_0, [x2_0])
-        x1_1 = self.up_2_0(x2_0, [x1_0])
-        x0_1 = self.up_1_0(x1_0, [x0_0])
-
-        x1_2 = self.up_2_1(x2_1, [x1_0, x1_1])
-        x0_2 = self.up_1_1(x1_1, [x0_0, x0_1])
-
-        x0_3 = self.up_1_2(x1_2, [x0_0, x0_1, x0_2])
-
-        # Deep supervision outputs
-        out3 = self.seg_heads[0](x2_1)
-        out2 = self.seg_heads[1](x1_2)
-        out1 = self.seg_heads[2](x0_3)
-
-        return out1, out2, out3
-
-# Modelo completo adaptado a U-Net++
+# --- Modelo Completo ---
 class CamouflageDetectionNet(nn.Module):
-    def __init__(self, features=[64, 128, 256, 512], pretrained=True):
+    def __init__(self, features=[64, 128, 320, 512], pretrained=True):
         super().__init__()
         self.backbone = pvt_v2_b2()
         if pretrained:
             self._load_backbone_weights('/kaggle/input/pretrained_pvt_v2_b2/pytorch/default/1/pvt_v2_b2.pth')
 
-        out_channels = [64, 128, 320, 512]
+        out_channels = [64, 128, 320, 512] 
 
         self.encoders = nn.ModuleList([
             UMambaConvBlock(out_channels[i], features[i]) for i in range(4)
         ])
 
-        self.decoder = UNetPlusPlusDecoder(features)
+        self.decoder3 = AdvancedDecoderBlock(features[3], features[2], features[2])
+        self.decoder2 = AdvancedDecoderBlock(features[2], features[1], features[1])
+        self.decoder1 = AdvancedDecoderBlock(features[1], features[0], features[0])
+
+        #self.final_decoder = UMambaConvBlock(features[0], features[0])
+
+        self.seg_heads = nn.ModuleList([
+            nn.Conv2d(features[2], 1, kernel_size=1),
+            nn.Conv2d(features[1], 1, kernel_size=1),
+            nn.Conv2d(features[0], 1, kernel_size=1),
+            nn.Conv2d(features[0], 1, kernel_size=1),
+        ])
 
     def forward(self, x: torch.Tensor):
+        # Backbone features
         skips = self.backbone.forward_features(x)
         enc_feats = [enc(skip) for enc, skip in zip(self.encoders, skips)]
 
-        out1, out2, out3 = self.decoder(enc_feats)
+        # Decoder path
+        d3 = self.decoder3(enc_feats[3], [enc_feats[2]])
+        d2 = self.decoder2(d3, [enc_feats[1]])
+        d1 = self.decoder1(d2, [enc_feats[0]])
 
-        # Interpolación a tamaño original
-        out1 = F.interpolate(out1, size=x.shape[2:], mode='bilinear', align_corners=False)
-        out2 = F.interpolate(out2, size=x.shape[2:], mode='bilinear', align_corners=False)
-        out3 = F.interpolate(out3, size=x.shape[2:], mode='bilinear', align_corners=False)
+        #d0 = self.final_decoder(d1)
+
+        # Deep supervision
+        out3 = F.interpolate(self.seg_heads[0](d3), size=x.shape[2:], mode='bilinear', align_corners=False)
+        out2 = F.interpolate(self.seg_heads[1](d2), size=x.shape[2:], mode='bilinear', align_corners=False)
+        out1 = F.interpolate(self.seg_heads[2](d1), size=x.shape[2:], mode='bilinear', align_corners=False)
+        #out0 = F.interpolate(self.seg_heads[3](d0), size=x.shape[2:], mode='bilinear', align_corners=False)
 
         final_out = (out1 + out2 + out3) / 3
 
