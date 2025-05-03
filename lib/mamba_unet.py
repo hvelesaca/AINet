@@ -231,7 +231,7 @@ class Conv_Block(nn.Module):
 
 # --- Modelo Completo ---
 class CamouflageDetectionNet(nn.Module):
-    def __init__(self, features=[64, 128, 256, 512], pretrained=True):
+    def __init__(self, features=[64, 128, 320, 512], pretrained=True):
         super().__init__()
         self.backbone = pvt_v2_b2()
         if pretrained:
