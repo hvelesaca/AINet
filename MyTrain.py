@@ -116,7 +116,7 @@ def train(train_loader, model, optimizer, epoch, test_path):
             gamma = 0.25
             #print('iteration num',len(P1))
             for it in range(len(P1)):
-                loss_P1 += (gamma * it) * losses[it]
+                loss_P1 += (gamma * (it+1)) * losses[it]
 
             loss_P2 = structure_loss(P2, gts)
 
@@ -207,16 +207,15 @@ if __name__ == '__main__':
     print("#" * 20, "Start Training", "#" * 20)
     best_mae = 1
     best_epoch = 0
-    cosine_schedule = optim.lr_scheduler.CosineAnnealingLR(optimizer=optimizer, T_max=20, eta_min=1e-5)
+    cosine_schedule = optim.lr_scheduler.CosineAnnealingLR(optimizer=optimizer, T_max=opt.epoch, eta_min=1e-6)
 
     for epoch in range(1, opt.epoch):
-         # schedule
+        # train
+        train(train_loader, model, optimizer, epoch, opt.save_path)
+        # schedule
         cosine_schedule.step()
         writer.add_scalar('learning_rate', cosine_schedule.get_lr()[0], global_step=epoch)
         logging.info('>>> current lr: {}'.format(cosine_schedule.get_lr()[0]))
-        
-        # train
-        train(train_loader, model, optimizer, epoch, opt.save_path)
         if epoch % opt.epoch_save==0:
             # validation
             val(model, epoch, opt.save_path, writer)
