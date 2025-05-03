@@ -238,7 +238,8 @@ class CamouflageDetectionNet(nn.Module):
             self._load_backbone_weights('/kaggle/input/pretrained_pvt_v2_b2/pytorch/default/1/pvt_v2_b2.pth')
 
         out_channels = [64, 128, 320, 512] 
-
+        channels=128
+        
         self.encoders = nn.ModuleList([
             UMambaConvBlock(out_channels[i], features[i]) for i in range(4)
         ])
