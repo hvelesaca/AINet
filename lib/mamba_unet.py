@@ -227,7 +227,7 @@ class CamouflageDetectionNet(nn.Module):
         self.decoder2 = AdvancedDecoderBlock(features[2], features[1], features[1])
         self.decoder1 = AdvancedDecoderBlock(features[1], features[0], features[0])
 
-        #self.final_decoder = UMambaConvBlock(features[0], features[0])
+        self.final_decoder = UMambaConvBlock(features[0], features[0])
 
         self.seg_heads = nn.ModuleList([
             nn.Conv2d(features[2], 1, kernel_size=1),
@@ -246,17 +246,17 @@ class CamouflageDetectionNet(nn.Module):
         d2 = self.decoder2(d3, [enc_feats[1]])
         d1 = self.decoder1(d2, [enc_feats[0]])
 
-        #d0 = self.final_decoder(d1)
+        d0 = self.final_decoder(d1)
 
         # Deep supervision
         out3 = F.interpolate(self.seg_heads[0](d3), size=x.shape[2:], mode='bilinear', align_corners=False)
         out2 = F.interpolate(self.seg_heads[1](d2), size=x.shape[2:], mode='bilinear', align_corners=False)
         out1 = F.interpolate(self.seg_heads[2](d1), size=x.shape[2:], mode='bilinear', align_corners=False)
-        #out0 = F.interpolate(self.seg_heads[3](d0), size=x.shape[2:], mode='bilinear', align_corners=False)
+        out0 = F.interpolate(self.seg_heads[3](d0), size=x.shape[2:], mode='bilinear', align_corners=False)
 
-        final_out = (out1 + out2 + out3) / 3
+        final_out = (out0 + out1 + out2 + out3) / 3
 
-        return [out1, out2, out3], final_out
+        return [out0 + out1, out2, out3], final_out
 
     def _load_backbone_weights(self, path: str):
         try:
