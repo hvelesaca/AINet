@@ -254,7 +254,7 @@ class CamouflageDetectionNet(nn.Module):
         out1 = F.interpolate(self.seg_heads[2](d1), size=x.shape[2:], mode='bilinear', align_corners=False)
         out0 = F.interpolate(self.seg_heads[3](d0), size=x.shape[2:], mode='bilinear', align_corners=False)
 
-        final_out = (out0 + out1 + out2 + out3) / 3
+        final_out = (out0 + out1 + out2 + out3) / 4
 
         return [out0 + out1, out2, out3], final_out
 
