@@ -5,23 +5,21 @@ from mamba_ssm import Mamba
 from huggingface_hub import hf_hub_download
 import timm
 from lib.pvtv2 import pvt_v2_b2
-from timm.models.layers import DropPath
 
 # Residual Block (Conv + InstanceNorm + LeakyReLU + Residual)
 class ResidualBlock(nn.Module):
-    def __init__(self, channels, drop_path=0.1):
+    def __init__(self, channels):
         super().__init__()
         self.conv = nn.Conv2d(channels, channels, kernel_size=3, padding=1, bias=False)
         self.norm = nn.InstanceNorm2d(channels)
         self.act = nn.LeakyReLU(0.2, inplace=True)
-        self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
 
     def forward(self, x):
         residual = x
         x = self.conv(x)
         x = self.norm(x)
         x = self.act(x)
-        return residual + self.drop_path(x)
+        return x + residual
     
 #https://github.com/Jongchan/attention-module/blob/c06383c514ab0032d044cc6fcd8c8207ea222ea7/MODELS/cbam.py
 class BasicConv(nn.Module):
@@ -211,7 +209,7 @@ class AdvancedDecoderBlock(nn.Module):
 
 # --- Modelo Completo ---
 class CamouflageDetectionNet(nn.Module):
-    def __init__(self, features=[64, 128, 320, 512], pretrained=True):
+    def __init__(self, features=[64, 128, 256, 512], pretrained=True):
         super().__init__()
         self.backbone = pvt_v2_b2()
         if pretrained:
@@ -256,7 +254,7 @@ class CamouflageDetectionNet(nn.Module):
 
         final_out = (out0 + out1 + out2 + out3) / 4
 
-        return [out0 + out1, out2, out3], final_out
+        return [out0, out1, out2, out3], final_out
 
     def _load_backbone_weights(self, path: str):
         try:
@@ -266,10 +264,11 @@ class CamouflageDetectionNet(nn.Module):
         except Exception as e:
             print(f"❌ Error cargando pesos backbone: {e}")
 
+
 # Ejemplo de uso optimizado
 if __name__ == "__main__":
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model = CamouflageDetectionNetUNetPP(pretrained=True).to(device)
+    model = CamouflageDetectionNet(pretrained=True).to(device)
     model.eval()
     with torch.no_grad():
         x = torch.randn(1, 3, 256, 256).to(device)
