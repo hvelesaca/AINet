@@ -75,3 +75,10 @@ for _data_name in [opt.test_path]:
         res = (res - res.min()) / (res.max() - res.min() + 1e-8)
         print('> {} - {}'.format(_data_name, name))
         cv2.imwrite(save_path+"/aivgnet/"+name,res*255)
+        
+        os.makedirs(save_path+"/aivgnet0", exist_ok=True)
+        res = F.upsample(P1[0], size=gt.shape, mode='bilinear', align_corners=False)
+        res = res.sigmoid().data.cpu().numpy().squeeze()
+        res = (res - res.min()) / (res.max() - res.min() + 1e-8)
+        print('> {} - {}'.format(_data_name, name))
+        cv2.imwrite(save_path+"/aivgnet0/"+name,res*255)
