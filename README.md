@@ -1,25 +1,30 @@
 ## [AIVGNet]()
 
-The more qualitative results of HitNet on four benchmarks (CAMO, CHAMELEON, NC4K, COD10K) have already been stored in [Google Drive](). <br>
-
-Our well-trained model is stored in [Google Drive](), which should be moved into the fold 'model_pth'. Google driver is out of service, please refer to [Huggingface]().If you have any question, please let me know!  For pretrained model, please use [Google Drive](). After downloading, please put it in the pretrained_pvt fold.
-
+The overall architecture of the proposed AIVGNet.
+ 
 ![benchmark](Figures/AIVGNet.png) <br>
 
+Table 1: Experimental results for SOTA COD techniques and the proposed AIVGNet architecture on benchmark datasets. The best three
+performing results are highlighted in red (first), blue (second), and green (third) respectively.
+
 ![benchmark](Figures/Table1.png) <br>
+
+Table 2: Experimental results for SOTA COD techniques and AIVGNet on cotton bollworm
+dataset [1]. The best three performing results are highlighted in red (first), blue (second),
+and green (third).
 
 ![benchmark](Figures/Table2.png) <br>
 
 <br>
 
 ```
-@inproceedings{hu2023high,
-  title={High-resolution iterative feedback network for camouflaged object detection},
-  author={Hu, Xiaobin and Wang, Shuo and Qin, Xuebin and Dai, Hang and Ren, Wenqi and Luo, Donghao and Tai, Ying and Shao, Ling},
-  booktitle={Proceedings of the AAAI Conference on Artificial Intelligence},
-  volume={37},
-  number={1},
-  pages={881--889},
-  year={2023}
+@article{meng2024camouflaged,
+  title={Camouflaged cotton bollworm instance segmentation based on PVT and Mask R-CNN},
+  author={Meng, Kexin and Xu, Kexin and Cattani, Piercarlo and Mei, Shuli},
+  journal={Computers and Electronics in Agriculture},
+  volume={226},
+  pages={109450},
+  year={2024},
+  publisher={Elsevier}
 }
 
