@@ -17,6 +17,14 @@ and green (third).
 
 <br>
 
+The more qualitative mask results of AIVGNet on three benchmarks (CAMO, NC4K, COD10K) and cotton bollworm datasets have already been stored in Kaggle.
+
+The pretrained model is stored in Kaggle. After downloading, please put it in the pretrained_pvt fold.
+
+Our well-trained models for benckmark and coton bollworm datasets are stored in Kaggle, which should be moved into the fold 'model_pth'. 
+
+<br>
+
 ```
 @article{meng2024camouflaged,
   title={Camouflaged cotton bollworm instance segmentation based on PVT and Mask R-CNN},
