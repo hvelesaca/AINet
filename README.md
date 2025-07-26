@@ -4,7 +4,11 @@ The more qualitative results of HitNet on four benchmarks (CAMO, CHAMELEON, NC4K
 
 Our well-trained model is stored in [Google Drive](), which should be moved into the fold 'model_pth'. Google driver is out of service, please refer to [Huggingface]().If you have any question, please let me know!  For pretrained model, please use [Google Drive](). After downloading, please put it in the pretrained_pvt fold.
 
-![benchmark](Figures/Benchmark.PNG) <br>
+![benchmark](Figures/AIVGNet.PNG) <br>
+
+![benchmark](Figures/Table1.PNG) <br>
+
+![benchmark](Figures/Table2.PNG) <br>
 
 <br>
 
