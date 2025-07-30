@@ -1,4 +1,4 @@
-## [AIVGNet]()
+## [AINet]()
 
 The overall architecture of the proposed AIVGNet.
  
