@@ -14,9 +14,9 @@ class CODataset(data.Dataset):
         self.trainsize = trainsize
         self.augmentations = augmentations
 
-        # Contar imágenes originales antes del filtrado
-        original_images = [f for f in os.listdir(image_root) if f.lower().endswith(('.jpg', '.png', '.jpeg', 'PNG', 'JPG'))]
-        original_gts = [f for f in os.listdir(gt_root) if f.lower().endswith(('.jpg', '.png', '.jpeg', 'PNG', 'JPG'))]
+        # Contar imágenes originales
+        original_images = [f for f in os.listdir(image_root) if f.lower().endswith(('.jpg', '.png', '.jpeg'))]
+        original_gts = [f for f in os.listdir(gt_root) if f.lower().endswith(('.jpg', '.png', '.jpeg'))]
 
         print(f"📊 ESTADÍSTICAS DEL DATASET:")
         print(f"   • Imágenes originales encontradas: {len(original_images)}")
@@ -25,11 +25,11 @@ class CODataset(data.Dataset):
         self.images = sorted([os.path.join(image_root, f) for f in original_images])
         self.gts = sorted([os.path.join(gt_root, f) for f in original_gts])
 
-        # Filtrar archivos y mostrar estadísticas
-        self.filter_files()
+        # Procesar archivos con resize automático
+        self.process_files()
         self.size = len(self.images)
 
-        print(f"   • Imágenes válidas después del filtrado: {self.size}")
+        print(f"   • Imágenes procesadas exitosamente: {self.size}")
 
         # Mostrar información sobre augmentaciones
         if self.augmentations:
@@ -70,40 +70,83 @@ class CODataset(data.Dataset):
             ],)  
 
     def __getitem__(self, index):
-        image = np.array(Image.open(self.images[index]).convert('RGB'))
-        gt = np.array(Image.open(self.gts[index]).convert('L'))
+        # Cargar imagen y máscara
+        image_path = self.images[index]
+        gt_path = self.gts[index]
 
-        augmented = self.transform(image=image, mask=gt)
-        image = augmented['image']
-        gt = augmented['mask'].unsqueeze(0).float() / 255.0
+        try:
+            # Cargar imagen
+            image = Image.open(image_path).convert('RGB')
+            gt = Image.open(gt_path).convert('L')
 
-        return image, gt
+            # Verificar si necesitan resize para coincidir
+            if image.size != gt.size:
+                # Usar el tamaño de la imagen como referencia
+                target_size = image.size
+                print(f"   🔧 Redimensionando máscara de {gt.size} a {target_size} para {os.path.basename(image_path)}")
 
-    def filter_files(self):
+                # Resize de la máscara usando interpolación bicúbica
+                gt = gt.resize(target_size, Image.BICUBIC)
+
+            # Convertir a numpy para Albumentations
+            image = np.array(image)
+            gt = np.array(gt)
+
+            # Aplicar transformaciones
+            augmented = self.transform(image=image, mask=gt)
+            image = augmented['image']
+            gt = augmented['mask'].unsqueeze(0).float() / 255.0
+
+            return image, gt
+
+        except Exception as e:
+            print(f"   ❌ Error procesando {os.path.basename(image_path)}: {str(e)}")
+            # En caso de error, devolver una imagen en blanco del tamaño correcto
+            dummy_image = torch.zeros(3, self.trainsize, self.trainsize)
+            dummy_gt = torch.zeros(1, self.trainsize, self.trainsize)
+            return dummy_image, dummy_gt
+
+    def process_files(self):
+        """
+        Procesa los archivos verificando que existan pares imagen-máscara
+        En lugar de filtrar, redimensiona automáticamente
+        """
         assert len(self.images) == len(self.gts), f"❌ Error: {len(self.images)} imágenes vs {len(self.gts)} ground truths"
 
-        images, gts = [], []
-        filtered_count = 0
+        valid_images, valid_gts = [], []
+        size_mismatches = 0
+        errors = 0
+
+        print(f"\n🔍 PROCESANDO ARCHIVOS:")
 
         for img_path, gt_path in zip(self.images, self.gts):
             try:
+                # Verificar que ambos archivos existan y se puedan abrir
                 img = Image.open(img_path)
                 gt = Image.open(gt_path)
 
-                if img.size == gt.size:
-                    images.append(img_path)
-                    gts.append(gt_path)
-                else:
-                    filtered_count += 1
-                    print(f"   ⚠️  Filtrada: {os.path.basename(img_path)} - tamaños no coinciden")
+                # Contar desajustes de tamaño (pero no filtrar)
+                if img.size != gt.size:
+                    size_mismatches += 1
+                    print(f"   📏 Tamaños diferentes: {os.path.basename(img_path)} {img.size} vs {os.path.basename(gt_path)} {gt.size}")
+
+                # Agregar a la lista válida (se redimensionará en __getitem__)
+                valid_images.append(img_path)
+                valid_gts.append(gt_path)
+
             except Exception as e:
-                filtered_count += 1
+                errors += 1
                 print(f"   ❌ Error al abrir: {os.path.basename(img_path)} - {str(e)}")
 
-        if filtered_count > 0:
-            print(f"   • Imágenes filtradas (eliminadas): {filtered_count}")
+        print(f"\n📈 RESUMEN DEL PROCESAMIENTO:")
+        print(f"   • Pares válidos: {len(valid_images)}")
+        print(f"   • Pares con tamaños diferentes (se redimensionarán): {size_mismatches}")
+        print(f"   • Archivos con errores (excluidos): {errors}")
 
-        self.images, self.gts = images, gts
+        if size_mismatches > 0:
+            print(f"   🔧 Las máscaras se redimensionarán automáticamente usando interpolación bicúbica")
+
+        self.images, self.gts = valid_images, valid_gts
 
     def __len__(self):
         return self.size
@@ -138,8 +181,8 @@ def get_loader(image_root, gt_root, batchsize, trainsize, shuffle=True, num_work
 class test_dataset:
     def __init__(self, image_root, gt_root, testsize):
         self.testsize = testsize
-        self.images = [image_root + f for f in os.listdir(image_root) if f.endswith('.jpg') or f.endswith('.png') or f.endswith('.jpeg') or f.endswith('.JPG') or f.endswith('.PNG')]
-        self.gts = [gt_root + f for f in os.listdir(gt_root) if f.endswith('.tif') or f.endswith('.png') or f.endswith('.jpg') or f.endswith('.jpeg') or f.endswith('.JPG') or f.endswith('.PNG')]
+        self.images = [image_root + f for f in os.listdir(image_root) if f.endswith('.jpg') or f.endswith('.png') or f.endswith('.jpeg') or f.endswith('.JPG')]
+        self.gts = [gt_root + f for f in os.listdir(gt_root) if f.endswith('.tif') or f.endswith('.png') or f.endswith('.jpg') or f.endswith('.jpeg') or f.endswith('.JPG')]
 
         self.images = sorted(self.images)
         self.gts = sorted(self.gts)
@@ -159,8 +202,14 @@ class test_dataset:
 
     def load_data(self):
         image = self.rgb_loader(self.images[self.index])
-        image = self.transform(image).unsqueeze(0)
         gt = self.binary_loader(self.gts[self.index])
+
+        # Verificar y ajustar tamaños si es necesario
+        if image.size != gt.size:
+            print(f"   🔧 Redimensionando GT de {gt.size} a {image.size} para test")
+            gt = gt.resize(image.size, Image.BICUBIC)
+
+        image = self.transform(image).unsqueeze(0)
 
         name = self.images[self.index].split('/')[-1]
         if name.endswith('.jpg'):
@@ -184,8 +233,8 @@ class test_dataset:
 class My_test_dataset:
     def __init__(self, image_root, gt_root, testsize):
         self.testsize = testsize
-        self.images = [image_root + f for f in os.listdir(image_root) if f.endswith('.jpg') or f.endswith('.png') or f.endswith('.jpeg') or f.endswith('.JPG') or f.endswith('.PNG')]
-        self.gts = [gt_root + f for f in os.listdir(gt_root) if f.endswith('.tif') or f.endswith('.jpg') or f.endswith('.png') or f.endswith('.jpeg') or f.endswith('.JPG') or f.endswith('.PNG')]
+        self.images = [image_root + f for f in os.listdir(image_root) if f.endswith('.jpg') or f.endswith('.png') or f.endswith('.jpeg') or f.endswith('.JPG')]
+        self.gts = [gt_root + f for f in os.listdir(gt_root) if f.endswith('.tif') or f.endswith('.jpg') or f.endswith('.png') or f.endswith('.jpeg') or f.endswith('.JPG')]
 
         self.images = sorted(self.images)
         self.gts = sorted(self.gts)
@@ -204,8 +253,14 @@ class My_test_dataset:
 
     def load_data(self):
         image = self.rgb_loader(self.images[self.index])
-        image = self.transform(image).unsqueeze(0)
         gt = self.binary_loader(self.gts[self.index])
+
+        # Verificar y ajustar tamaños si es necesario
+        if image.size != gt.size:
+            print(f"   🔧 Redimensionando GT de {gt.size} a {image.size} para mi test")
+            gt = gt.resize(image.size, Image.BICUBIC)
+
+        image = self.transform(image).unsqueeze(0)
 
         name = self.images[self.index].split('/')[-1]
         if name.endswith('.jpg'):
@@ -242,6 +297,7 @@ def show_dataset_summary(train_loader, test_dataset=None):
     print(f"   • Batch size: {train_loader.batch_size}")
     print(f"   • Batches por época: {len(train_loader)}")
     print(f"   • Augmentaciones: {'✅ Activadas' if train_dataset.augmentations else '❌ Desactivadas'}")
+    print(f"   • Resize automático: ✅ Activado (interpolación bicúbica)")
 
     if test_dataset:
         print(f"\n🧪 PRUEBA:")
@@ -253,3 +309,47 @@ def show_dataset_summary(train_loader, test_dataset=None):
     print(f"   • Num workers: {train_loader.num_workers}")
     print(f"   • Pin memory: {'✅' if train_loader.pin_memory else '❌'}")
     print(f"="*60)
+
+# Función para verificar la integridad del dataset
+def verify_dataset_integrity(image_root, gt_root):
+    """
+    Verifica la integridad del dataset y muestra estadísticas de tamaños
+    """
+    print(f"\n🔍 VERIFICANDO INTEGRIDAD DEL DATASET...")
+
+    images = sorted([f for f in os.listdir(image_root) if f.lower().endswith(('.jpg', '.png', '.jpeg'))])
+    gts = sorted([f for f in os.listdir(gt_root) if f.lower().endswith(('.jpg', '.png', '.jpeg'))])
+
+    size_stats = {}
+    mismatches = 0
+
+    for img_name, gt_name in zip(images, gts):
+        try:
+            img = Image.open(os.path.join(image_root, img_name))
+            gt = Image.open(os.path.join(gt_root, gt_name))
+
+            img_size = img.size
+            gt_size = gt.size
+
+            if img_size != gt_size:
+                mismatches += 1
+                print(f"   📏 {img_name}: imagen {img_size} vs máscara {gt_size}")
+
+            # Estadísticas de tamaños
+            if img_size not in size_stats:
+                size_stats[img_size] = 0
+            size_stats[img_size] += 1
+
+        except Exception as e:
+            print(f"   ❌ Error con {img_name}: {e}")
+
+    print(f"\n📊 ESTADÍSTICAS DE TAMAÑOS:")
+    for size, count in sorted(size_stats.items(), key=lambda x: x[1], reverse=True):
+        print(f"   • {size}: {count} imágenes")
+
+    print(f"\n📈 RESUMEN:")
+    print(f"   • Total de pares: {len(images)}")
+    print(f"   • Pares con tamaños diferentes: {mismatches}")
+    print(f"   • Pares que necesitan resize: {mismatches}")
+
+    return len(images), mismatches
