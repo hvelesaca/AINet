@@ -33,6 +33,84 @@ def load_matched_state_dict(model, state_dict, print_stats=True):
     model.load_state_dict(curr_state_dict)
     if print_stats:
         print(f'Loaded state_dict: {num_matched}/{num_total} matched')
+
+def flatten_binary_scores(scores, labels):
+    """
+    Flattens predictions and labels for binary classification.
+    Removes pixels with label -1 (optional ignore label).
+    """
+    scores = scores.view(-1)
+    labels = labels.view(-1)
+    valid = (labels != -1)
+    vscores = scores[valid]
+    vlabels = labels[valid]
+    return vscores, vlabels
+    
+def lovasz_hinge(logits, labels, per_image=True):
+    """
+    Binary Lovasz hinge loss
+    logits: [B, 1, H, W] (raw predictions, no sigmoid)
+    labels: [B, 1, H, W] (binary ground truth: 0 or 1)
+    """
+    if per_image:
+        loss = torch.mean(torch.stack([
+            lovasz_hinge_flat(*flatten_binary_scores(log.unsqueeze(0), lab.unsqueeze(0)))
+            for log, lab in zip(logits, labels)
+        ]))
+    else:
+        loss = lovasz_hinge_flat(*flatten_binary_scores(logits, labels))
+    return loss
+
+
+def lovasz_hinge_flat(logits, labels):
+    """
+    Flat binary Lovasz hinge loss
+    logits: [P] Variable, logits at each prediction (between -∞ and +∞)
+    labels: [P] Tensor, binary ground truth labels (0 or 1)
+    """
+    if len(labels) == 0:
+        return logits.sum() * 0.
+
+    signs = 2. * labels - 1.
+    errors = 1. - logits * signs
+    errors_sorted, perm = torch.sort(errors, dim=0, descending=True)
+    gt_sorted = labels[perm]
+
+    grad = lovasz_grad(gt_sorted)
+    loss = torch.dot(F.relu(errors_sorted), grad)
+    return loss
+
+
+def lovasz_grad(gt_sorted):
+    """
+    Computes gradient of the Lovasz extension w.r.t sorted errors
+    gt_sorted: sorted ground truth labels (descending)
+    """
+    p = len(gt_sorted)
+    gts = gt_sorted.sum().item()
+    intersection = gts - gt_sorted.float().cumsum(0)
+    union = gts + (1 - gt_sorted).float().cumsum(0)
+    jaccard = 1. - intersection / union
+    if p > 1:
+        jaccard[1:p] = jaccard[1:p] - jaccard[0:-1]
+    return jaccard
+    
+def structure_loss2(pred, mask):
+    # Weighted BCE
+    weit = 1 + 5 * torch.abs(F.avg_pool2d(mask, kernel_size=31, stride=1, padding=15) - mask)
+    wbce = F.binary_cross_entropy_with_logits(pred, mask, reduction='none')
+    wbce = (weit * wbce).sum(dim=(2, 3)) / weit.sum(dim=(2, 3))
+
+    # Weighted IoU
+    pred_sigmoid = torch.sigmoid(pred)
+    inter = ((pred_sigmoid * mask) * weit).sum(dim=(2, 3))
+    union = ((pred_sigmoid + mask) * weit).sum(dim=(2, 3))
+    wiou = 1 - (inter + 1) / (union - inter + 1)
+
+    # Lovasz hinge loss
+    lovasz = lovasz_hinge(pred, mask)
+
+    return (wbce + wiou).mean() + lovasz
     
 def structure_loss(pred, mask):
     weit = 1 + 5 * torch.abs(F.avg_pool2d(mask, kernel_size=31, stride=1, padding=15) - mask)
@@ -116,7 +194,7 @@ def train(train_loader, model, optimizer, epoch, test_path):
             gamma = 0.25
             #print('iteration num',len(P1))
             for it in range(len(P1)):
-                loss_P1 += (gamma * (it+1)) * losses[it]
+                loss_P1 += (gamma * it) * losses[it]
 
             loss_P2 = structure_loss(P2, gts)
 
@@ -137,7 +215,7 @@ def train(train_loader, model, optimizer, epoch, test_path):
     # save model
     save_path = opt.save_path
     if epoch % opt.epoch_save == 0:
-        torch.save(model.state_dict(), save_path + str(epoch) + 'AIVGNet-PVT.pth')
+        torch.save(model.state_dict(), save_path + str(epoch) + 'AINet-PVT.pth')
     
 if __name__ == '__main__':
 
@@ -151,7 +229,7 @@ if __name__ == '__main__':
     parser.add_argument('--lr', type=float,default=1e-4, help='learning rate')
     parser.add_argument('--optimizer', type=str,default='AdamW', help='choosing optimizer AdamW or SGD')
     parser.add_argument('--augmentation',default=True, help='choose to do random flip rotation')
-    parser.add_argument('--batchsize', type=int,default=15, help='training batch size')
+    parser.add_argument('--batchsize', type=int,default=16, help='training batch size')
     parser.add_argument('--trainsize', type=int,default=352, help='training dataset size,candidate=352,704,1056')
     parser.add_argument('--clip', type=float,default=0.5, help='gradient clipping margin')
     parser.add_argument('--load', type=str, default=None, help='train from checkpoints')
@@ -159,7 +237,7 @@ if __name__ == '__main__':
     parser.add_argument('--decay_epoch', type=int,default=30, help='every n epochs decay learning rate')
     parser.add_argument('--train_path', type=str,default=f'{dataset}/train',help='path to train dataset')
     parser.add_argument('--test_path', type=str,default=f'{dataset}/val',help='path to testing dataset')
-    parser.add_argument('--save_path', type=str,default=f'./model_pth/AIVGNet_{dataset}/')
+    parser.add_argument('--save_path', type=str,default=f'./model_pth/AINet_{dataset}/')
     parser.add_argument('--epoch_save', type=int,default=5, help='every n epochs to save model')
     opt = parser.parse_args()
 
@@ -207,15 +285,16 @@ if __name__ == '__main__':
     print("#" * 20, "Start Training", "#" * 20)
     best_mae = 1
     best_epoch = 0
-    cosine_schedule = optim.lr_scheduler.CosineAnnealingLR(optimizer=optimizer, T_max=opt.epoch, eta_min=1e-6)
+    cosine_schedule = optim.lr_scheduler.CosineAnnealingLR(optimizer=optimizer, T_max=20, eta_min=1e-5)
 
     for epoch in range(1, opt.epoch):
-        # train
-        train(train_loader, model, optimizer, epoch, opt.save_path)
-        # schedule
+         # schedule
         cosine_schedule.step()
         writer.add_scalar('learning_rate', cosine_schedule.get_lr()[0], global_step=epoch)
         logging.info('>>> current lr: {}'.format(cosine_schedule.get_lr()[0]))
+        
+        # train
+        train(train_loader, model, optimizer, epoch, opt.save_path)
         if epoch % opt.epoch_save==0:
             # validation
             val(model, epoch, opt.save_path, writer)
