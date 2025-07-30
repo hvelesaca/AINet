@@ -49,7 +49,7 @@ class CODataset(data.Dataset):
         """
         Preprocesa y redimensiona las imágenes UNA SOLA VEZ al inicializar
         """
-        print(f"\n🔧 PREPROCESANDO IMÁGENES (una sola vez):")
+        #print(f"\n🔧 PREPROCESANDO IMÁGENES (una sola vez):")
 
         self.processed_data = []
         resized_count = 0
@@ -198,10 +198,10 @@ class test_dataset:
         self.images = sorted(self.images)
         self.gts = sorted(self.gts)
 
-        print(f"\n🧪 DATASET DE PRUEBA:")
-        print(f"   • Imágenes de prueba: {len(self.images)}")
-        print(f"   • Ground truths de prueba: {len(self.gts)}")
-        print(f"   • ⚠️  NOTA: Las imágenes de prueba se redimensionan en cada load_data()")
+        #print(f"\n🧪 DATASET DE PRUEBA:")
+        #print(f"   • Imágenes de prueba: {len(self.images)}")
+        #print(f"   • Ground truths de prueba: {len(self.gts)}")
+        #print(f"   • ⚠️  NOTA: Las imágenes de prueba se redimensionan en cada load_data()")
 
         self.transform = transforms.Compose([
             transforms.Resize((self.testsize, self.testsize)),
