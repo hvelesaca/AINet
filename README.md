@@ -4,7 +4,7 @@ The overall architecture of the proposed AIVGNet.
  
 ![benchmark](Figures/AIVGNet.png) <br>
 
-Table 1: Experimental results for SOTA COD techniques and the proposed AIVGNet architecture on benchmark datasets. The best three
+Table 1: Experimental results for SOTA COD techniques and the proposed AINet architecture on benchmark datasets. The best three
 performing results are highlighted in red (first), blue (second), and green (third) respectively.
 
 ![benchmark](Figures/Table1.png) <br>
