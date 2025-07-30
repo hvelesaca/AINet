@@ -25,128 +25,131 @@ class CODataset(data.Dataset):
         self.images = sorted([os.path.join(image_root, f) for f in original_images])
         self.gts = sorted([os.path.join(gt_root, f) for f in original_gts])
 
-        # Procesar archivos con resize automático
-        self.process_files()
-        self.size = len(self.images)
+        # Preprocesar y redimensionar UNA SOLA VEZ
+        self.preprocess_and_resize()
+        self.size = len(self.processed_data)
 
-        print(f"   • Imágenes procesadas exitosamente: {self.size}")
+        print(f"   • Pares procesados exitosamente: {self.size}")
 
         # Mostrar información sobre augmentaciones
         if self.augmentations:
-            print(f"   • Augmentaciones ACTIVADAS - cada imagen se puede transformar de múltiples formas")
-            print(f"   • Número efectivo de variaciones por época: {self.size} × (transformaciones aleatorias)")
+            print(f"   • 🔄 AUGMENTACIONES ACTIVADAS:")
+            print(f"     - Cada imagen se transforma aleatoriamente en cada época")
+            print(f"     - Variaciones efectivas por época: {self.size} × múltiples transformaciones")
+            print(f"     - HorizontalFlip, VerticalFlip, Rotaciones, Brillo, Contraste, etc.")
         else:
-            print(f"   • Augmentaciones DESACTIVADAS - solo resize y normalización")
-            print(f"   • Número de imágenes para entrenamiento: {self.size}")
+            print(f"   • ❌ AUGMENTACIONES DESACTIVADAS:")
+            print(f"     - Solo resize y normalización")
+            print(f"     - Número fijo de imágenes: {self.size}")
 
+        # Configurar transformaciones
         self.transform = self.get_transforms()
+
+    def preprocess_and_resize(self):
+        """
+        Preprocesa y redimensiona las imágenes UNA SOLA VEZ al inicializar
+        """
+        print(f"\n🔧 PREPROCESANDO IMÁGENES (una sola vez):")
+
+        self.processed_data = []
+        resized_count = 0
+        error_count = 0
+
+        for img_path, gt_path in zip(self.images, self.gts):
+            try:
+                # Cargar imagen y máscara
+                image = Image.open(img_path).convert('RGB')
+                gt = Image.open(gt_path).convert('L')
+
+                # Verificar si necesitan resize
+                if image.size != gt.size:
+                    resized_count += 1
+                    target_size = image.size  # Usar tamaño de la imagen como referencia
+                    print(f"   📏 Redimensionando {os.path.basename(gt_path)}: {gt.size} → {target_size}")
+
+                    # Resize de la máscara usando interpolación bicúbica
+                    gt = gt.resize(target_size, Image.BICUBIC)
+
+                # Convertir a numpy arrays y guardar
+                image_np = np.array(image)
+                gt_np = np.array(gt)
+
+                self.processed_data.append((image_np, gt_np))
+
+            except Exception as e:
+                error_count += 1
+                print(f"   ❌ Error procesando {os.path.basename(img_path)}: {str(e)}")
+
+        print(f"\n📈 RESUMEN DEL PREPROCESAMIENTO:")
+        print(f"   • Pares procesados: {len(self.processed_data)}")
+        print(f"   • Máscaras redimensionadas: {resized_count}")
+        print(f"   • Errores encontrados: {error_count}")
+        print(f"   • ✅ Todas las imágenes están listas para augmentación")
 
     def get_transforms(self):
         if self.augmentations:
-            print('🔄 Usando Albumentations avanzadas para augmentación:')
-            print('   - HorizontalFlip (50%), VerticalFlip (50%), RandomRotate90 (50%)')
-            print('   - ShiftScaleRotate (50%), RandomBrightnessContrast (50%)')
-            print('   - GaussNoise (30%), HueSaturationValue (30%)')
-            return A.Compose([
+            print('\n🎨 CONFIGURANDO AUGMENTACIONES AVANZADAS:')
+            transform = A.Compose([
                 A.Resize(self.trainsize, self.trainsize),
                 A.HorizontalFlip(p=0.5),
                 A.VerticalFlip(p=0.5),
                 A.RandomRotate90(p=0.5),
-                A.ShiftScaleRotate(shift_limit=0.1, scale_limit=0.1, rotate_limit=45, p=0.5, border_mode=0),
-                A.RandomBrightnessContrast(p=0.5),
-                A.GaussNoise(p=0.3),
-                A.HueSaturationValue(p=0.3),
-                A.Normalize(mean=(0.485, 0.456, 0.406),
-                            std=(0.229, 0.224, 0.225)),
+                A.ShiftScaleRotate(
+                    shift_limit=0.1, 
+                    scale_limit=0.1, 
+                    rotate_limit=45, 
+                    p=0.5, 
+                    border_mode=0
+                ),
+                A.RandomBrightnessContrast(
+                    brightness_limit=0.2,
+                    contrast_limit=0.2,
+                    p=0.5
+                ),
+                A.GaussNoise(var_limit=(10.0, 50.0), p=0.3),
+                A.HueSaturationValue(
+                    hue_shift_limit=20,
+                    sat_shift_limit=30,
+                    val_shift_limit=20,
+                    p=0.3
+                ),
+                A.Normalize(
+                    mean=(0.485, 0.456, 0.406),
+                    std=(0.229, 0.224, 0.225)
+                ),
                 ToTensorV2()
-            ],)
+            ])
+
+            print('   ✅ Augmentaciones configuradas:')
+            print('      - Geométricas: Flip H/V (50%), Rotación 90° (50%), ShiftScaleRotate (50%)')
+            print('      - Fotométricas: Brillo/Contraste (50%), Ruido Gaussiano (30%)')
+            print('      - Color: HSV (30%)')
+            print('      - Normalización ImageNet + ToTensor')
+
+            return transform
         else:
-            print('➡️  Sin augmentación, solo resize y normalización')
-            return A.Compose([
+            print('\n➡️  CONFIGURANDO TRANSFORMACIONES BÁSICAS:')
+            transform = A.Compose([
                 A.Resize(self.trainsize, self.trainsize),
-                A.Normalize(mean=(0.485, 0.456, 0.406),
-                            std=(0.229, 0.224, 0.225)),
+                A.Normalize(
+                    mean=(0.485, 0.456, 0.406),
+                    std=(0.229, 0.224, 0.225)
+                ),
                 ToTensorV2()
-            ],)  
+            ])
+            print('   ✅ Solo resize + normalización configurados')
+            return transform
 
     def __getitem__(self, index):
-        # Cargar imagen y máscara
-        image_path = self.images[index]
-        gt_path = self.gts[index]
+        # Obtener datos preprocesados (ya redimensionados una vez)
+        image_np, gt_np = self.processed_data[index]
 
-        try:
-            # Cargar imagen
-            image = Image.open(image_path).convert('RGB')
-            gt = Image.open(gt_path).convert('L')
+        # Aplicar augmentaciones (si están activadas)
+        augmented = self.transform(image=image_np, mask=gt_np)
+        image = augmented['image']
+        gt = augmented['mask'].unsqueeze(0).float() / 255.0
 
-            # Verificar si necesitan resize para coincidir
-            if image.size != gt.size:
-                # Usar el tamaño de la imagen como referencia
-                target_size = image.size
-                print(f"   🔧 Redimensionando máscara de {gt.size} a {target_size} para {os.path.basename(image_path)}")
-
-                # Resize de la máscara usando interpolación bicúbica
-                gt = gt.resize(target_size, Image.BICUBIC)
-
-            # Convertir a numpy para Albumentations
-            image = np.array(image)
-            gt = np.array(gt)
-
-            # Aplicar transformaciones
-            augmented = self.transform(image=image, mask=gt)
-            image = augmented['image']
-            gt = augmented['mask'].unsqueeze(0).float() / 255.0
-
-            return image, gt
-
-        except Exception as e:
-            print(f"   ❌ Error procesando {os.path.basename(image_path)}: {str(e)}")
-            # En caso de error, devolver una imagen en blanco del tamaño correcto
-            dummy_image = torch.zeros(3, self.trainsize, self.trainsize)
-            dummy_gt = torch.zeros(1, self.trainsize, self.trainsize)
-            return dummy_image, dummy_gt
-
-    def process_files(self):
-        """
-        Procesa los archivos verificando que existan pares imagen-máscara
-        En lugar de filtrar, redimensiona automáticamente
-        """
-        assert len(self.images) == len(self.gts), f"❌ Error: {len(self.images)} imágenes vs {len(self.gts)} ground truths"
-
-        valid_images, valid_gts = [], []
-        size_mismatches = 0
-        errors = 0
-
-        print(f"\n🔍 PROCESANDO ARCHIVOS:")
-
-        for img_path, gt_path in zip(self.images, self.gts):
-            try:
-                # Verificar que ambos archivos existan y se puedan abrir
-                img = Image.open(img_path)
-                gt = Image.open(gt_path)
-
-                # Contar desajustes de tamaño (pero no filtrar)
-                if img.size != gt.size:
-                    size_mismatches += 1
-                    print(f"   📏 Tamaños diferentes: {os.path.basename(img_path)} {img.size} vs {os.path.basename(gt_path)} {gt.size}")
-
-                # Agregar a la lista válida (se redimensionará en __getitem__)
-                valid_images.append(img_path)
-                valid_gts.append(gt_path)
-
-            except Exception as e:
-                errors += 1
-                print(f"   ❌ Error al abrir: {os.path.basename(img_path)} - {str(e)}")
-
-        print(f"\n📈 RESUMEN DEL PROCESAMIENTO:")
-        print(f"   • Pares válidos: {len(valid_images)}")
-        print(f"   • Pares con tamaños diferentes (se redimensionarán): {size_mismatches}")
-        print(f"   • Archivos con errores (excluidos): {errors}")
-
-        if size_mismatches > 0:
-            print(f"   🔧 Las máscaras se redimensionarán automáticamente usando interpolación bicúbica")
-
-        self.images, self.gts = valid_images, valid_gts
+        return image, gt
 
     def __len__(self):
         return self.size
@@ -157,6 +160,7 @@ def get_loader(image_root, gt_root, batchsize, trainsize, shuffle=True, num_work
     print(f"   • Directorio de ground truths: {gt_root}")
     print(f"   • Tamaño de entrenamiento: {trainsize}x{trainsize}")
     print(f"   • Batch size: {batchsize}")
+    print(f"   • Augmentaciones: {'✅ Activadas' if augmentation else '❌ Desactivadas'}")
 
     dataset = CODataset(image_root, gt_root, trainsize, augmentation)
 
@@ -169,13 +173,20 @@ def get_loader(image_root, gt_root, batchsize, trainsize, shuffle=True, num_work
     print(f"   • Batches por época: {total_batches}")
     if remaining_samples > 0:
         print(f"   • Muestras en el último batch: {remaining_samples}")
-    print(f"   • Muestras procesadas por época: {len(dataset)}")
 
-    data_loader = data.DataLoader(dataset=dataset,
-                                  batch_size=batchsize,
-                                  shuffle=shuffle,
-                                  num_workers=num_workers,
-                                  pin_memory=pin_memory)
+    if augmentation:
+        print(f"   • 🎲 Variaciones por época: INFINITAS (transformaciones aleatorias)")
+        print(f"   • 🔄 Cada época verá versiones diferentes de las mismas imágenes")
+    else:
+        print(f"   • 📊 Muestras fijas por época: {len(dataset)}")
+
+    data_loader = data.DataLoader(
+        dataset=dataset,
+        batch_size=batchsize,
+        shuffle=shuffle,
+        num_workers=num_workers,
+        pin_memory=pin_memory
+    )
     return data_loader
 
 class test_dataset:
@@ -190,12 +201,13 @@ class test_dataset:
         print(f"\n🧪 DATASET DE PRUEBA:")
         print(f"   • Imágenes de prueba: {len(self.images)}")
         print(f"   • Ground truths de prueba: {len(self.gts)}")
+        print(f"   • ⚠️  NOTA: Las imágenes de prueba se redimensionan en cada load_data()")
 
         self.transform = transforms.Compose([
             transforms.Resize((self.testsize, self.testsize)),
             transforms.ToTensor(),
-            transforms.Normalize([0.485, 0.456, 0.406],
-                                 [0.229, 0.224, 0.225])])
+            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+        ])
         self.gt_transform = transforms.ToTensor()
         self.size = len(self.images)
         self.index = 0
@@ -204,9 +216,8 @@ class test_dataset:
         image = self.rgb_loader(self.images[self.index])
         gt = self.binary_loader(self.gts[self.index])
 
-        # Verificar y ajustar tamaños si es necesario
+        # Verificar y ajustar tamaños si es necesario (solo para test)
         if image.size != gt.size:
-            print(f"   🔧 Redimensionando GT de {gt.size} a {image.size} para test")
             gt = gt.resize(image.size, Image.BICUBIC)
 
         image = self.transform(image).unsqueeze(0)
@@ -230,90 +241,68 @@ class test_dataset:
     def __len__(self):
         return self.size
 
-class My_test_dataset:
-    def __init__(self, image_root, gt_root, testsize):
-        self.testsize = testsize
-        self.images = [image_root + f for f in os.listdir(image_root) if f.endswith('.jpg') or f.endswith('.png') or f.endswith('.jpeg') or f.endswith('.JPG')]
-        self.gts = [gt_root + f for f in os.listdir(gt_root) if f.endswith('.tif') or f.endswith('.jpg') or f.endswith('.png') or f.endswith('.jpeg') or f.endswith('.JPG')]
-
-        self.images = sorted(self.images)
-        self.gts = sorted(self.gts)
-
-        print(f"\n🔍 MI DATASET DE PRUEBA:")
-        print(f"   • Imágenes de prueba: {len(self.images)}")
-        print(f"   • Ground truths de prueba: {len(self.gts)}")
-
-        self.transform = transforms.Compose([
-            transforms.Resize((self.testsize, self.testsize)),
-            transforms.ToTensor(),
-            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
-        self.gt_transform = transforms.ToTensor()
-        self.size = len(self.images)
-        self.index = 0
-
-    def load_data(self):
-        image = self.rgb_loader(self.images[self.index])
-        gt = self.binary_loader(self.gts[self.index])
-
-        # Verificar y ajustar tamaños si es necesario
-        if image.size != gt.size:
-            print(f"   🔧 Redimensionando GT de {gt.size} a {image.size} para mi test")
-            gt = gt.resize(image.size, Image.BICUBIC)
-
-        image = self.transform(image).unsqueeze(0)
-
-        name = self.images[self.index].split('/')[-1]
-        if name.endswith('.jpg'):
-            name = name.split('.jpg')[0] + '.png'
-        self.index += 1
-        return image, gt, name
-
-    def rgb_loader(self, path):
-        with open(path, 'rb') as f:
-            img = Image.open(f)
-            return img.convert('RGB')
-
-    def binary_loader(self, path):
-        with open(path, 'rb') as f:
-            img = Image.open(f)
-            return img.convert('L')
-
-    def __len__(self):
-        return self.size
-
-# Función adicional para mostrar resumen completo del dataset
+# Función para mostrar resumen completo del dataset
 def show_dataset_summary(train_loader, test_dataset=None):
     """
-    Muestra un resumen completo del dataset
+    Muestra un resumen completo del dataset con información de augmentaciones
     """
-    print(f"\n" + "="*60)
+    print(f"\n" + "="*70)
     print(f"📋 RESUMEN COMPLETO DEL DATASET")
-    print(f"="*60)
+    print(f"="*70)
 
     # Información del dataset de entrenamiento
     train_dataset = train_loader.dataset
     print(f"🏋️  ENTRENAMIENTO:")
-    print(f"   • Imágenes totales: {len(train_dataset)}")
+    print(f"   • Imágenes base: {len(train_dataset)}")
     print(f"   • Batch size: {train_loader.batch_size}")
     print(f"   • Batches por época: {len(train_loader)}")
-    print(f"   • Augmentaciones: {'✅ Activadas' if train_dataset.augmentations else '❌ Desactivadas'}")
-    print(f"   • Resize automático: ✅ Activado (interpolación bicúbica)")
+    print(f"   • Preprocesamiento: ✅ Una sola vez al inicializar")
+
+    if train_dataset.augmentations:
+        print(f"   • Augmentaciones: ✅ ACTIVADAS")
+        print(f"     - Cada imagen se transforma aleatoriamente")
+        print(f"     - Variaciones por época: INFINITAS")
+        print(f"     - Diversidad: Muy alta")
+    else:
+        print(f"   • Augmentaciones: ❌ DESACTIVADAS")
+        print(f"     - Imágenes fijas por época: {len(train_dataset)}")
+        print(f"     - Diversidad: Limitada")
 
     if test_dataset:
         print(f"\n🧪 PRUEBA:")
         print(f"   • Imágenes de prueba: {len(test_dataset)}")
+        print(f"   • Augmentaciones: ❌ Desactivadas (solo resize)")
 
     print(f"\n💾 CONFIGURACIÓN:")
     print(f"   • Tamaño de imagen: {train_dataset.trainsize}x{train_dataset.trainsize}")
     print(f"   • Shuffle: {'✅' if train_loader.sampler is None else '❌'}")
     print(f"   • Num workers: {train_loader.num_workers}")
     print(f"   • Pin memory: {'✅' if train_loader.pin_memory else '❌'}")
-    print(f"="*60)
+    print(f"="*70)
 
-# Función para verificar la integridad del dataset
+# Función para demostrar el efecto de las augmentaciones
+def demonstrate_augmentations(dataset, num_samples=3):
+    """
+    Demuestra cómo las augmentaciones crean diferentes versiones de la misma imagen
+    """
+    if not dataset.augmentations:
+        print("❌ Las augmentaciones están desactivadas")
+        return
+
+    print(f"\n🎨 DEMOSTRACIÓN DE AUGMENTACIONES:")
+    print(f"Mostrando {num_samples} transformaciones de la primera imagen...")
+
+    for i in range(num_samples):
+        image, gt = dataset[0]  # Siempre la misma imagen base
+        print(f"   Muestra {i+1}: Tensor shape {image.shape}, GT shape {gt.shape}")
+        print(f"   - Valores únicos en imagen: {len(torch.unique(image))}")
+        print(f"   - Min/Max imagen: {image.min():.3f}/{image.max():.3f}")
+
+    print("✅ Cada llamada produce una transformación diferente!")
+
 def verify_dataset_integrity(image_root, gt_root):
     """
-    Verifica la integridad del dataset y muestra estadísticas de tamaños
+    Verifica la integridad del dataset antes del preprocesamiento
     """
     print(f"\n🔍 VERIFICANDO INTEGRIDAD DEL DATASET...")
 
@@ -333,7 +322,6 @@ def verify_dataset_integrity(image_root, gt_root):
 
             if img_size != gt_size:
                 mismatches += 1
-                print(f"   📏 {img_name}: imagen {img_size} vs máscara {gt_size}")
 
             # Estadísticas de tamaños
             if img_size not in size_stats:
@@ -350,6 +338,6 @@ def verify_dataset_integrity(image_root, gt_root):
     print(f"\n📈 RESUMEN:")
     print(f"   • Total de pares: {len(images)}")
     print(f"   • Pares con tamaños diferentes: {mismatches}")
-    print(f"   • Pares que necesitan resize: {mismatches}")
+    print(f"   • 🔧 Se redimensionarán {mismatches} máscaras UNA SOLA VEZ")
 
     return len(images), mismatches
