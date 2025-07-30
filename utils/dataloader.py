@@ -15,8 +15,8 @@ class CODataset(data.Dataset):
         self.augmentations = augmentations
 
         # Contar imágenes originales antes del filtrado
-        original_images = [f for f in os.listdir(image_root) if f.lower().endswith(('.jpg', '.png', '.jpeg'))]
-        original_gts = [f for f in os.listdir(gt_root) if f.lower().endswith(('.jpg', '.png', '.jpeg'))]
+        original_images = [f for f in os.listdir(image_root) if f.lower().endswith(('.jpg', '.png', '.jpeg', 'PNG', 'JPG'))]
+        original_gts = [f for f in os.listdir(gt_root) if f.lower().endswith(('.jpg', '.png', '.jpeg', 'PNG', 'JPG'))]
 
         print(f"📊 ESTADÍSTICAS DEL DATASET:")
         print(f"   • Imágenes originales encontradas: {len(original_images)}")
@@ -138,8 +138,8 @@ def get_loader(image_root, gt_root, batchsize, trainsize, shuffle=True, num_work
 class test_dataset:
     def __init__(self, image_root, gt_root, testsize):
         self.testsize = testsize
-        self.images = [image_root + f for f in os.listdir(image_root) if f.endswith('.jpg') or f.endswith('.png') or f.endswith('.jpeg') or f.endswith('.JPG')]
-        self.gts = [gt_root + f for f in os.listdir(gt_root) if f.endswith('.tif') or f.endswith('.png') or f.endswith('.jpg') or f.endswith('.jpeg') or f.endswith('.JPG')]
+        self.images = [image_root + f for f in os.listdir(image_root) if f.endswith('.jpg') or f.endswith('.png') or f.endswith('.jpeg') or f.endswith('.JPG') or f.endswith('.PNG')]
+        self.gts = [gt_root + f for f in os.listdir(gt_root) if f.endswith('.tif') or f.endswith('.png') or f.endswith('.jpg') or f.endswith('.jpeg') or f.endswith('.JPG') or f.endswith('.PNG')]
 
         self.images = sorted(self.images)
         self.gts = sorted(self.gts)
@@ -184,8 +184,8 @@ class test_dataset:
 class My_test_dataset:
     def __init__(self, image_root, gt_root, testsize):
         self.testsize = testsize
-        self.images = [image_root + f for f in os.listdir(image_root) if f.endswith('.jpg') or f.endswith('.png') or f.endswith('.jpeg') or f.endswith('.JPG')]
-        self.gts = [gt_root + f for f in os.listdir(gt_root) if f.endswith('.tif') or f.endswith('.jpg') or f.endswith('.png') or f.endswith('.jpeg') or f.endswith('.JPG')]
+        self.images = [image_root + f for f in os.listdir(image_root) if f.endswith('.jpg') or f.endswith('.png') or f.endswith('.jpeg') or f.endswith('.JPG') or f.endswith('.PNG')]
+        self.gts = [gt_root + f for f in os.listdir(gt_root) if f.endswith('.tif') or f.endswith('.jpg') or f.endswith('.png') or f.endswith('.jpeg') or f.endswith('.JPG') or f.endswith('.PNG')]
 
         self.images = sorted(self.images)
         self.gts = sorted(self.gts)
