@@ -114,7 +114,7 @@ class CBAM(nn.Module):
         return x_out
 
 class UMambaConvBlock(nn.Module):
-    def __init__(self, in_channels: int, out_channels: int, mamba_dim: int = 64, use_cbam: bool = False):
+    def __init__(self, in_channels: int, out_channels: int, mamba_dim: int = 64, use_mamba: bool = True, use_cbam: bool = False):
         super().__init__()
         self.project_in = nn.Conv2d(in_channels, out_channels, kernel_size=1, bias=False)
 
@@ -127,7 +127,10 @@ class UMambaConvBlock(nn.Module):
         self.linear1_branch1 = nn.Linear(out_channels, out_channels)
         self.conv1d_branch1 = nn.Conv1d(out_channels, out_channels, kernel_size=1)
         self.act_branch1 = nn.SiLU()
-        self.mamba = Mamba(d_model=out_channels, d_state=mamba_dim, d_conv=4, expand=2)
+        
+        # Mamba
+        if self.use_mamba:
+            self.mamba = Mamba(d_model=out_channels, d_state=mamba_dim, d_conv=4, expand=2)
 
         # Branch 2
         self.linear1_branch2 = nn.Linear(out_channels, out_channels)
@@ -162,7 +165,11 @@ class UMambaConvBlock(nn.Module):
         branch1 = self.conv1d_branch1(branch1)
         branch1 = branch1.transpose(1, 2)
         branch1 = self.act_branch1(branch1)
-        branch1 = self.mamba(branch1)
+        
+        # Aplicar Mamba solo si está activo
+        if self.use_mamba:
+            branch1 = self.mamba(branch1)
+        
         # Branch 2
         branch2 = self.linear1_branch2(x)
         branch2 = self.act_branch2(branch2)
