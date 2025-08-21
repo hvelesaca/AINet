@@ -129,6 +129,7 @@ class UMambaConvBlock(nn.Module):
         self.act_branch1 = nn.SiLU()
         
         # Mamba
+        self.use_mamba = use_mamba
         if self.use_mamba:
             self.mamba = Mamba(d_model=out_channels, d_state=mamba_dim, d_conv=4, expand=2)
 
