@@ -35,8 +35,8 @@ Table 4: Experimental results for SOTA COD techniques and the proposed AINet arc
 
 <br>
 
-The more qualitative mask results of AINet on three benchmarks (CAMO, NC4K, COD10K) and cotton bollworm datasets have already been stored in Kaggle.
+The more qualitative mask results of AINet on Cotton Bollworm, Mango and three benchmarks (CAMO, NC4K, COD10K) datasets have already been stored in Kaggle.  
 
 The pretrained model is stored in Kaggle. After downloading, please put it in the pretrained_pvt fold.
 
-Our well-trained models for benckmark and coton bollworm datasets are stored in Kaggle, which should be moved into the fold 'model_pth'. 
+Our well-trained models for Coton Bollworm, Mango and Benckmark datasets are stored in Kaggle, which should be moved into the fold 'model_pth'. 
