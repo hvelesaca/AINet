@@ -19,11 +19,13 @@ Figure 3: Prediction results of seven SOTA COD techniques and AINet, evaluated o
 ## Mango Dataset - Results
 
 Table 3: Experimental results for SOTA COD techniques and AINet on Mango dataset. The best three performing results are highlighted in red (first), blue (second), and green (third).
+
 <img src="Figures/AINet_Mango.PNG" alt="benchmark" width="60%"/>
 
 <br>
 
 Figure 4: Prediction results of seven SOTA COD techniques and AINet, evaluated on example images from the Mango dataset. Successful matches between GT and predicted masks (white areas); False positive regions (red areas, over-segmentation); and false negative regions (green areas, miss-segmentation).
+
 <img src="Figures/AINet_Mango_Fig.PNG" alt="benchmark" width="90%"/>
 
 
