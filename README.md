@@ -16,7 +16,7 @@ The overall architecture of the proposed AINet.
 Experimental results for SOTA COD techniques and the proposed AINet architecture on benchmark datasets. The best three
 performing results are highlighted in red (first), blue (second), and green (third) respectively.
 
-![benchmark](Figures/Table1.png) <br>
+![benchmark](Figures/Benchmarks.png) <br>
 
 <br>
 
