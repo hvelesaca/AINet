@@ -5,23 +5,14 @@ The overall architecture of the proposed AINet.
 ![benchmark](Figures/AIVGNet.png) <br>
 
 ## Cotton Bollworm Dataset - Results
-
-![benchmark](Figures/AINet_CottonBollworm.PNG) <br>
-
-![benchmark](Figures/AINet_CottonBollworm_Fig.PNG) <br>
-
-<img src="Figures/AINet_CottonBollworm.PNG" alt="benchmark" width="500"/>
-<img src="Figures/AINet_CottonBollworm_Fig.PNG" alt="benchmark" width="500"/>
-
+<img src="Figures/AINet_CottonBollworm.PNG" alt="benchmark" width="60%"/>
+<img src="Figures/AINet_CottonBollworm_Fig.PNG" alt="benchmark" width="90%"/>
 
 ## Mango Dataset - Results
-![benchmark](Figures/AINet_Mango.PNG) <br>
-
-![benchmark](Figures/AINet_Mango_Fig.PNG) <br>
-
+<img src="Figures/AINet_Mango.PNG" alt="benchmark" width="60%"/>
+<img src="Figures/AINet_Mango_Fig.PNG" alt="benchmark" width="90%"/>
 
 ## Benchmark - Results
-
 Experimental results for SOTA COD techniques and the proposed AINet architecture on benchmark datasets. The best three
 performing results are highlighted in red (first), blue (second), and green (third) respectively.
 
