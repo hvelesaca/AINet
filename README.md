@@ -2,7 +2,7 @@
 
 The overall architecture of the proposed AINet.
  
-![benchmark](Figures/AIVGNet.png) <br>
+![benchmark](Figures/AINet.png) <br>
 
 ## Cotton Bollworm Dataset - Results
 <img src="Figures/AINet_CottonBollworm.PNG" alt="benchmark" width="60%"/>
