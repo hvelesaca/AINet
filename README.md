@@ -1,6 +1,6 @@
 ## [AINet]()
 
-The overall architecture of the proposed AIVGNet.
+The overall architecture of the proposed AINet.
  
 ![benchmark](Figures/AIVGNet.png) <br>
 
@@ -9,7 +9,7 @@ performing results are highlighted in red (first), blue (second), and green (thi
 
 ![benchmark](Figures/Table1.png) <br>
 
-Table 2: Experimental results for SOTA COD techniques and AIVGNet on cotton bollworm
+Table 2: Experimental results for SOTA COD techniques and AINet on cotton bollworm
 dataset [1]. The best three performing results are highlighted in red (first), blue (second),
 and green (third).
 
@@ -17,7 +17,7 @@ and green (third).
 
 <br>
 
-The more qualitative mask results of AIVGNet on three benchmarks (CAMO, NC4K, COD10K) and cotton bollworm datasets have already been stored in Kaggle.
+The more qualitative mask results of AINet on three benchmarks (CAMO, NC4K, COD10K) and cotton bollworm datasets have already been stored in Kaggle.
 
 The pretrained model is stored in Kaggle. After downloading, please put it in the pretrained_pvt fold.
 
