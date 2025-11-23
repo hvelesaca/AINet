@@ -145,8 +145,8 @@ for _data_name in [opt.test_path]:
         superimposed_img = cv2.addWeighted(img_np, 0.6, heatmap, 0.4, 0)
     
         # Guarda el resultado
-        os.makedirs(save_path+"/gradcam", exist_ok=True)
-        cv2.imwrite(save_path+"/gradcam_2/"+name, superimposed_img)
+        os.makedirs(save_path+"/gradcam_1", exist_ok=True)
+        cv2.imwrite(save_path+"/gradcam_1/"+name, superimposed_img)
         print('> Grad-CAM guardado en', save_path+"/gradcam/"+name)
         
         # Grad-CAM 2
@@ -167,7 +167,7 @@ for _data_name in [opt.test_path]:
         superimposed_img = cv2.addWeighted(img_np, 0.6, heatmap, 0.4, 0)
     
         # Guarda el resultado
-        os.makedirs(save_path+"/gradcam", exist_ok=True)
+        os.makedirs(save_path+"/gradcam_2", exist_ok=True)
         cv2.imwrite(save_path+"/gradcam_2/"+name, superimposed_img)
         print('> Grad-CAM guardado en', save_path+"/gradcam/"+name)
 
@@ -189,7 +189,7 @@ for _data_name in [opt.test_path]:
         superimposed_img = cv2.addWeighted(img_np, 0.6, heatmap, 0.4, 0)
     
         # Guarda el resultado
-        os.makedirs(save_path+"/gradcam", exist_ok=True)
+        os.makedirs(save_path+"/gradcam_d1", exist_ok=True)
         cv2.imwrite(save_path+"/gradcam_d1/"+name, superimposed_img)
         print('> Grad-CAM guardado en', save_path+"/gradcam/"+name)
 
@@ -211,7 +211,7 @@ for _data_name in [opt.test_path]:
         superimposed_img = cv2.addWeighted(img_np, 0.6, heatmap, 0.4, 0)
     
         # Guarda el resultado
-        os.makedirs(save_path+"/gradcam", exist_ok=True)
+        os.makedirs(save_path+"/gradcam_d2", exist_ok=True)
         cv2.imwrite(save_path+"/gradcam_d2/"+name, superimposed_img)
         print('> Grad-CAM guardado en', save_path+"/gradcam/"+name)
 
@@ -233,7 +233,7 @@ for _data_name in [opt.test_path]:
         superimposed_img = cv2.addWeighted(img_np, 0.6, heatmap, 0.4, 0)
     
         # Guarda el resultado
-        os.makedirs(save_path+"/gradcam", exist_ok=True)
+        os.makedirs(save_path+"/gradcam_d3", exist_ok=True)
         cv2.imwrite(save_path+"/gradcam_d3/"+name, superimposed_img)
         print('> Grad-CAM guardado en', save_path+"/gradcam/"+name)
         
