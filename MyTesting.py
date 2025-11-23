@@ -68,6 +68,11 @@ for _data_name in [opt.test_path]:
     
     model = CamouflageDetectionNet(pretrained=True).cuda()
 
+    # Recorre todas las subcapas y muestra las convolucionales
+    for name, module in model.named_modules():
+        if isinstance(module, torch.nn.Conv2d):
+            print(f"{name}: {module}")
+
     model.load_state_dict(torch.load(opt.pth_path))
     model.cuda()
     model.eval()
@@ -123,25 +128,24 @@ for _data_name in [opt.test_path]:
         cv2.imwrite(save_path+"/out1out2out3out4final/"+name,res*255)
 
         # Grad-CAM
-        if i == 0:
-            # Elige la capa: la última capa convolucional del final_decoder
-            target_layer = model.final_decoder.res_block2.conv  # O ajusta según tu modelo
-        
-            # image: tensor [1, 3, H, W]
-            cam = generate_gradcam(model, image, target_layer)
-        
-            # Prepara la imagen de entrada para superponer
-            img_np = image.cpu().squeeze().permute(1,2,0).numpy()
-            img_np = (img_np - img_np.min()) / (img_np.max() - img_np.min())
-            img_np = (img_np * 255).astype(np.uint8)
-            img_np = cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR)
-        
-            # Superpone el Grad-CAM
-            heatmap = cv2.applyColorMap(cam, cv2.COLORMAP_JET)
-            superimposed_img = cv2.addWeighted(img_np, 0.6, heatmap, 0.4, 0)
-        
-            # Guarda el resultado
-            os.makedirs(save_path+"/gradcam", exist_ok=True)
-            cv2.imwrite(save_path+"/gradcam/"+name, superimposed_img)
-            print('> Grad-CAM guardado en', save_path+"/gradcam/"+name)
+        # Elige la capa: la última capa convolucional del final_decoder
+        target_layer = model.final_decoder.res_block2.conv  # O ajusta según tu modelo
+    
+        # image: tensor [1, 3, H, W]
+        cam = generate_gradcam(model, image, target_layer)
+    
+        # Prepara la imagen de entrada para superponer
+        img_np = image.cpu().squeeze().permute(1,2,0).numpy()
+        img_np = (img_np - img_np.min()) / (img_np.max() - img_np.min())
+        img_np = (img_np * 255).astype(np.uint8)
+        img_np = cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR)
+    
+        # Superpone el Grad-CAM
+        heatmap = cv2.applyColorMap(cam, cv2.COLORMAP_JET)
+        superimposed_img = cv2.addWeighted(img_np, 0.6, heatmap, 0.4, 0)
+    
+        # Guarda el resultado
+        os.makedirs(save_path+"/gradcam", exist_ok=True)
+        cv2.imwrite(save_path+"/gradcam/"+name, superimposed_img)
+        print('> Grad-CAM guardado en', save_path+"/gradcam/"+name)
         
