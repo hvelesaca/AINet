@@ -18,7 +18,7 @@ Figure 3: Prediction results of seven SOTA COD techniques and AINet, evaluated o
 
 ## Mango Dataset - Results
 
-Table 3: Experimental results for SOTA COD techniques and AINet on Mango dataset. The best three performing results are highlighted in red (first), blue (second), and green (third).
+Table 3: Experimental results for SOTA COD techniques and AINet on the Mango dataset. The best three performing results are highlighted in red (first), blue (second), and green (third).
 
 <img src="Figures/AINet_Mango.PNG" alt="benchmark" width="60%"/>
 
@@ -30,13 +30,16 @@ Figure 4: Prediction results of seven SOTA COD techniques and AINet, evaluated o
 
 
 ## Benchmark - Results
-Table 4: Experimental results for SOTA COD techniques and the proposed AINet architecture on benchmark datasets. The best three performing results are highlighted in red (first), blue (second), and green (third) respectively.
+Table 4: Experimental results for SOTA COD techniques and the proposed AINet architecture on benchmark datasets. The best three performing results are highlighted in red (first), blue (second), and green (third), respectively.
 ![benchmark](Figures/Benchmarks.png) <br>
 
 <br>
 
-The more qualitative mask results of AINet on Cotton Bollworm, Mango and three benchmarks (CAMO, NC4K, COD10K) datasets have already been stored in Kaggle.  
+The more qualitative mask results of AINet on Cotton Bollworm, Mango, and three benchmarks (CAMO, NC4K, COD10K) datasets have already been stored in Kaggle.  
 
-The pretrained model is stored in Kaggle. After downloading, please put it in the pretrained_pvt fold.
+The pretrained model is stored in Kaggle. After downloading, please put it in the pretrained_pvt folder.
 
-Our well-trained models for Coton Bollworm, Mango and Benckmark datasets are stored in Kaggle, which should be moved into the fold 'model_pth'. 
+Our well-trained models for Coton Bollworm, Mango, and Benchmark datasets are stored in Kaggle, which should be moved into the 'model_pth'. 
+
+Kaggle: https://www.kaggle.com/code/hvelesaca/ainet 
+
