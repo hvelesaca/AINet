@@ -241,7 +241,7 @@ for _data_name in [opt.test_path]:
 
         # --- Grad-CAM para todas las capas convolucionales ---
         for layer_name, layer_module in model.named_modules():
-            if isinstance(layer_module, torch.nn.Conv2d) and layer_name.contains("seg_heads_"):
+            if isinstance(layer_module, torch.nn.Conv2d) and "seg_heads" in layer_name:
                 try:
                     cam = generate_gradcam(model, image, layer_module)
                 except Exception as e:
