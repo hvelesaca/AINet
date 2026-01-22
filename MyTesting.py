@@ -73,7 +73,7 @@ for _data_name in [opt.test_path]:
         if isinstance(module, torch.nn.Conv2d):
             print(f"{name}: {module}")
 
-    model.load_state_dict(torch.load(opt.pth_path))
+    model.load_state_dict(torch.load(opt.pth_path), strict=False)
     model.cuda()
     model.eval()
 
