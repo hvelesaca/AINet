@@ -92,6 +92,7 @@ for _data_name in [opt.test_path]:
 
         P1, P2 = model(image)
 
+        """
         os.makedirs(save_path+"/final", exist_ok=True)
         res = F.upsample(P2, size=gt.shape, mode='bilinear', align_corners=False)
         res = res.sigmoid().data.cpu().numpy().squeeze()
@@ -119,7 +120,8 @@ for _data_name in [opt.test_path]:
         res = (res - res.min()) / (res.max() - res.min() + 1e-8)
         print('> {} - {}'.format(_data_name, name))
         cv2.imwrite(save_path+"/out2out3out4final/"+name,res*255)
-
+        """
+        
         os.makedirs(save_path+"/out1out2out3out4final", exist_ok=True)
         res = F.upsample(P1[0] + P1[1] + P1[2] + P1[3] + P2, size=gt.shape, mode='bilinear', align_corners=False)
         res = res.sigmoid().data.cpu().numpy().squeeze()
@@ -127,118 +129,7 @@ for _data_name in [opt.test_path]:
         print('> {} - {}'.format(_data_name, name))
         cv2.imwrite(save_path+"/out1out2out3out4final/"+name,res*255)
 
-        '''
-        # Grad-CAM 1
-        # Elige la capa: la última capa convolucional del final_decoder
-        target_layer = model.final_decoder.res_block1.conv  # O ajusta según tu modelo
-    
-        # image: tensor [1, 3, H, W]
-        cam = generate_gradcam(model, image, target_layer)
-    
-        # Prepara la imagen de entrada para superponer
-        img_np = image.cpu().squeeze().permute(1,2,0).numpy()
-        img_np = (img_np - img_np.min()) / (img_np.max() - img_np.min())
-        img_np = (img_np * 255).astype(np.uint8)
-        img_np = cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR)
-    
-        # Superpone el Grad-CAM
-        heatmap = cv2.applyColorMap(cam, cv2.COLORMAP_JET)
-        superimposed_img = cv2.addWeighted(img_np, 0.6, heatmap, 0.4, 0)
-    
-        # Guarda el resultado
-        os.makedirs(save_path+"/gradcam_1", exist_ok=True)
-        cv2.imwrite(save_path+"/gradcam_1/"+name, superimposed_img)
-        print('> Grad-CAM guardado en', save_path+"/gradcam/"+name)
-        
-        # Grad-CAM 2
-        # Elige la capa: la última capa convolucional del final_decoder
-        target_layer = model.final_decoder.res_block2.conv  # O ajusta según tu modelo
-    
-        # image: tensor [1, 3, H, W]
-        cam = generate_gradcam(model, image, target_layer)
-    
-        # Prepara la imagen de entrada para superponer
-        img_np = image.cpu().squeeze().permute(1,2,0).numpy()
-        img_np = (img_np - img_np.min()) / (img_np.max() - img_np.min())
-        img_np = (img_np * 255).astype(np.uint8)
-        img_np = cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR)
-    
-        # Superpone el Grad-CAM
-        heatmap = cv2.applyColorMap(cam, cv2.COLORMAP_JET)
-        superimposed_img = cv2.addWeighted(img_np, 0.6, heatmap, 0.4, 0)
-    
-        # Guarda el resultado
-        os.makedirs(save_path+"/gradcam_2", exist_ok=True)
-        cv2.imwrite(save_path+"/gradcam_2/"+name, superimposed_img)
-        print('> Grad-CAM guardado en', save_path+"/gradcam/"+name)
-
-        # Grad-CAM D1
-        # Elige la capa: la última capa convolucional del final_decoder
-        target_layer = model.decoder1.umamba_block.res_block2.conv  # O ajusta según tu modelo
-    
-        # image: tensor [1, 3, H, W]
-        cam = generate_gradcam(model, image, target_layer)
-    
-        # Prepara la imagen de entrada para superponer
-        img_np = image.cpu().squeeze().permute(1,2,0).numpy()
-        img_np = (img_np - img_np.min()) / (img_np.max() - img_np.min())
-        img_np = (img_np * 255).astype(np.uint8)
-        img_np = cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR)
-    
-        # Superpone el Grad-CAM
-        heatmap = cv2.applyColorMap(cam, cv2.COLORMAP_JET)
-        superimposed_img = cv2.addWeighted(img_np, 0.6, heatmap, 0.4, 0)
-    
-        # Guarda el resultado
-        os.makedirs(save_path+"/gradcam_d1", exist_ok=True)
-        cv2.imwrite(save_path+"/gradcam_d1/"+name, superimposed_img)
-        print('> Grad-CAM guardado en', save_path+"/gradcam/"+name)
-
-        # Grad-CAM D2
-        # Elige la capa: la última capa convolucional del final_decoder
-        target_layer = model.decoder2.umamba_block.res_block2.conv  # O ajusta según tu modelo
-    
-        # image: tensor [1, 3, H, W]
-        cam = generate_gradcam(model, image, target_layer)
-    
-        # Prepara la imagen de entrada para superponer
-        img_np = image.cpu().squeeze().permute(1,2,0).numpy()
-        img_np = (img_np - img_np.min()) / (img_np.max() - img_np.min())
-        img_np = (img_np * 255).astype(np.uint8)
-        img_np = cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR)
-    
-        # Superpone el Grad-CAM
-        heatmap = cv2.applyColorMap(cam, cv2.COLORMAP_JET)
-        superimposed_img = cv2.addWeighted(img_np, 0.6, heatmap, 0.4, 0)
-    
-        # Guarda el resultado
-        os.makedirs(save_path+"/gradcam_d2", exist_ok=True)
-        cv2.imwrite(save_path+"/gradcam_d2/"+name, superimposed_img)
-        print('> Grad-CAM guardado en', save_path+"/gradcam/"+name)
-
-        # Grad-CAM CBAM
-        # Elige la capa: la última capa convolucional del final_decoder
-        target_layer = model.final_decoder.res_block2.conv  # O ajusta según tu modelo
-    
-        # image: tensor [1, 3, H, W]
-        cam = generate_gradcam(model, image, target_layer)
-    
-        # Prepara la imagen de entrada para superponer
-        img_np = image.cpu().squeeze().permute(1,2,0).numpy()
-        img_np = (img_np - img_np.min()) / (img_np.max() - img_np.min())
-        img_np = (img_np * 255).astype(np.uint8)
-        img_np = cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR)
-    
-        # Superpone el Grad-CAM
-        heatmap = cv2.applyColorMap(cam, cv2.COLORMAP_JET)
-        superimposed_img = cv2.addWeighted(img_np, 0.6, heatmap, 0.4, 0)
-    
-        # Guarda el resultado
-        os.makedirs(save_path+"/gradcam_cbam", exist_ok=True)
-        cv2.imwrite(save_path+"/gradcam_cbam/"+name, superimposed_img)
-        print('> Grad-CAM guardado en', save_path+"/gradcam/"+name)
-        '''
-
+        """
         # --- Grad-CAM para todas las capas convolucionales ---
         for layer_name, layer_module in model.named_modules():
             if isinstance(layer_module, torch.nn.Conv2d) and "seg_heads" in layer_name:
@@ -263,5 +154,5 @@ for _data_name in [opt.test_path]:
                 os.makedirs(f"{save_path}/gradcam_all/{safe_layer_name}", exist_ok=True)
                 cv2.imwrite(f"{save_path}/gradcam_all/{safe_layer_name}/{name}", superimposed_img)
                 print(f'> Grad-CAM guardado en gradcam_all/{safe_layer_name}/{name}')
-
+        """
         
