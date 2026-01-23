@@ -114,7 +114,7 @@ class CBAM(nn.Module):
         return x_out
 
 class UMambaConvBlock(nn.Module):
-    def __init__(self, in_channels: int, out_channels: int, mamba_dim: int = 64, use_mamba: bool = False, use_cbam: bool = True):
+    def __init__(self, in_channels: int, out_channels: int, mamba_dim: int = 64, use_mamba: bool = True, use_cbam: bool = True):
         super().__init__()
         self.project_in = nn.Conv2d(in_channels, out_channels, kernel_size=1, bias=False)
 
