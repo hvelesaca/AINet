@@ -9,17 +9,36 @@ from lib.mamba_unet import CamouflageDetectionNet
 
 import matplotlib.pyplot as plt
 
-import torch
 from fvcore.nn import FlopCountAnalysis, flop_count_table
 
 @torch.no_grad()
-def flops_fvcore(model, example_inputs):
+def flops_fvcore(model, example_inputs, device=None, match_dtype=True):
     model.eval()
-    flops = FlopCountAnalysis(model, example_inputs)
-    # FLOPs totales (float)
-    total_flops = flops.total()
-    return total_flops, flop_count_table(flops)
 
+    p = next(model.parameters(), None)
+    if device is None:
+        device = p.device if p is not None else torch.device("cpu")
+    model = model.to(device)
+
+    target_dtype = p.dtype if (match_dtype and p is not None) else None
+
+    def move(obj):
+        if torch.is_tensor(obj):
+            obj = obj.to(device)
+            if target_dtype is not None:
+                obj = obj.to(target_dtype)
+            return obj
+        if isinstance(obj, (list, tuple)):
+            return type(obj)(move(o) for o in obj)
+        if isinstance(obj, dict):
+            return {k: move(v) for k, v in obj.items()}
+        return obj
+
+    example_inputs = move(example_inputs)
+
+    flops = FlopCountAnalysis(model, example_inputs)
+    return flops.total(), flop_count_table(flops)
+    
 def generate_gradcam(model, image_tensor, target_layer, class_idx=None):
     model.eval()
     gradients = []
