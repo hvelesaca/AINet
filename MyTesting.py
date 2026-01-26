@@ -104,7 +104,7 @@ for _data_name in [opt.test_path]:
     x = torch.randn(1, 3, 224, 224)
     total_flops, table = flops_fvcore(model, (x,))
     print("FLOPs:", total_flops)
-    print("Table: ", table)
+    #print("Table: ", table)
     
     # Recorre todas las subcapas y muestra las convolucionales
     for name, module in model.named_modules():
