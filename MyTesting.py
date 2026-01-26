@@ -11,6 +11,8 @@ import matplotlib.pyplot as plt
 
 from fvcore.nn import FlopCountAnalysis, flop_count_table
 
+import time
+
 @torch.no_grad()
 def flops_fvcore(model, example_inputs, device=None, match_dtype=True):
     model.eval()
@@ -120,6 +122,8 @@ for _data_name in [opt.test_path]:
     test_loader = My_test_dataset(image_root, gt_root, opt.testsize)
     print('****',test_loader.size)
     for i in range(test_loader.size):
+        t0 = time.perf_counter()
+
         image, gt, name = test_loader.load_data()
         print('***name',name)
         gt = np.asarray(gt, np.float32)
@@ -127,6 +131,9 @@ for _data_name in [opt.test_path]:
         image = image.cuda()
 
         P1, P2 = model(image)
+
+        t1 = time.perf_counter()
+        print(f"Tiempo: {(t1 - t0):.6f} s")
 
         """
         os.makedirs(save_path+"/final", exist_ok=True)
