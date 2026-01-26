@@ -9,6 +9,17 @@ from lib.mamba_unet import CamouflageDetectionNet
 
 import matplotlib.pyplot as plt
 
+import torch
+from fvcore.nn import FlopCountAnalysis, flop_count_table
+
+@torch.no_grad()
+def flops_fvcore(model, example_inputs):
+    model.eval()
+    flops = FlopCountAnalysis(model, example_inputs)
+    # FLOPs totales (float)
+    total_flops = flops.total()
+    return total_flops, flop_count_table(flops)
+
 def generate_gradcam(model, image_tensor, target_layer, class_idx=None):
     model.eval()
     gradients = []
@@ -68,6 +79,12 @@ for _data_name in [opt.test_path]:
     
     model = CamouflageDetectionNet(pretrained=True).cuda()
 
+    # Ejemplo:
+    x = torch.randn(1, 3, 224, 224)
+    total_flops, table = flops_fvcore(model, (x,))
+    print("FLOPs:", total_flops)
+    print("Table: ", table)
+    
     # Recorre todas las subcapas y muestra las convolucionales
     for name, module in model.named_modules():
         if isinstance(module, torch.nn.Conv2d):
