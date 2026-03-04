@@ -1,4 +1,5 @@
 ## [AINet]()
+Paper: https://doi.org/10.1109/ACCESS.2026.3668115
 
 The overall architecture of the proposed AINet.
  
