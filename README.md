@@ -49,7 +49,7 @@ Our well-trained models for Coton Bollworm, Mango, and Benchmark datasets are st
 
 
 ## Citation
-Please cite this paper if you find it helpful.
+If you use AINet, please cite the following paper.
 ```
 @article{velesaca2026ainet,
   title={AINet: Integrating Mamba and CBAM for Enhanced Camouflage Object Detection},
