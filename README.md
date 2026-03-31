@@ -14,7 +14,7 @@ Experimental results for SOTA COD techniques and the proposed AINet architecture
 
 ## Cotton Bollworm Dataset - Results
 
-Experimental results for SOTA COD techniques and AINet on Cotton Bollworm dataset. The best three performing results are highlighted in red (first), blue (second), and green (third).
+Experimental results for SOTA COD techniques and AINet on the Cotton Bollworm dataset. The best three performing results are highlighted in red (first), blue (second), and green (third).
 
 <img src="Figures/AINet_CottonBollworm.PNG" alt="benchmark" width="60%"/>
 
@@ -41,7 +41,7 @@ Prediction results of seven SOTA COD techniques and AINet, evaluated on example 
 ## CODE
 Code for training and testing available at Kaggle: https://www.kaggle.com/code/hvelesaca/ainet 
 
-The more qualitative mask results of AINet on Cotton Bollworm, Mango, and three benchmarks (CAMO, NC4K, COD10K) datasets have already been stored in Kaggle.  
+The more qualitative mask results of AINet on Cotton Bollworm, Mango, and three benchmarks (CAMO, NC4K, COD10K) datasets are available in the folder [results](results).
 
 The pretrained model is stored in Kaggle. After downloading, please put it in the pretrained_pvt folder.
 
