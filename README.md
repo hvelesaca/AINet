@@ -47,3 +47,17 @@ The pretrained model is stored in Kaggle. After downloading, please put it in th
 
 Our well-trained models for Coton Bollworm, Mango, and Benchmark datasets are stored in Kaggle, which should be moved into the 'model_pth'. 
 
+
+# Citation
+Please cite this paper if you find it helpful.
+```
+@article{velesaca2026ainet,
+  title={AINet: Integrating Mamba and CBAM for Enhanced Camouflage Object Detection},
+  author={Velesaca, Henry O and Mero, P Andrea and Reyes-Angulo, Abel and Sappa, Angel D},
+  journal={IEEE Access},
+  year={2026},
+  publisher={IEEE}
+}
+```
+
+
