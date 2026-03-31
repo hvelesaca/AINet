@@ -48,7 +48,7 @@ The pretrained model is stored in Kaggle. After downloading, please put it in th
 Our well-trained models for Coton Bollworm, Mango, and Benchmark datasets are stored in Kaggle, which should be moved into the 'model_pth'. 
 
 
-# Citation
+## Citation
 Please cite this paper if you find it helpful.
 ```
 @article{velesaca2026ainet,
